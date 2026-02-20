@@ -31,6 +31,7 @@ dependencies:
 
   # UI 核心
   cupertino_icons: ^1.0.2
+  appinio_swiper: ^2.0.0
 
 dev_dependencies:
   flutter_test:
