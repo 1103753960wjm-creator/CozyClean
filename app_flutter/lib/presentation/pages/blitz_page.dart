@@ -17,6 +17,15 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
   final AppinioSwiperController _swiperController = AppinioSwiperController();
 
   @override
+  void initState() {
+    super.initState();
+    // 在首帧渲染后触发照片加载，避免在 widget 构建期间修改 Provider 状态
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(blitzControllerProvider.notifier).loadPhotos();
+    });
+  }
+
+  @override
   void dispose() {
     _swiperController.dispose();
     super.dispose();
@@ -35,6 +44,22 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
           const Center(
               child: CircularProgressIndicator(
                   valueColor: AlwaysStoppedAnimation(Color(0xFF8BA888)))));
+    }
+    // +++++++ 新增：如果有错误信息（比如权限被拒），把它显示在屏幕上 +++++++
+    if (state.errorMessage != null) {
+      return _buildScaffold(
+        context,
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Text(
+              state.errorMessage!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.redAccent, fontSize: 16),
+            ),
+          ),
+        ),
+      );
     }
     if (state.photos.isEmpty) {
       return _buildScaffold(context, _buildEmptyState());
@@ -57,14 +82,19 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                 cardCount: state.photos.length,
                 onSwipeEnd: (int previousIndex, int targetIndex,
                     SwiperActivity activity) {
-                  // 滑动结束时触发业务流
+                  // 安全边界检查：防止滑完最后一张后越界
+                  if (previousIndex < 0 || previousIndex >= state.photos.length)
+                    return;
                   _handleSwipeEnd(
                       activity, notifier, state.photos[previousIndex]);
                 },
                 // 卡片生成器
                 cardBuilder: (BuildContext context, int index) {
+                  // 安全边界检查：AppinioSwiper 可能请求超出范围的索引
+                  if (index < 0 || index >= state.photos.length) {
+                    return const SizedBox.shrink();
+                  }
                   final photo = state.photos[index];
-                  // 是否缓存高质量图片由 Controller 确定以防 OOM
                   final shouldLoad = notifier.shouldCacheImage(index);
 
                   return PhotoCard(

@@ -49,10 +49,13 @@ class BlitzController extends Notifier<BlitzState> {
   /// 目标保留的未处理照片数量
   static const int _targetPhotoCount = 50;
 
+  /// 私有防重入标志，避免与 state.isLoading 初始值冲突
+  bool _loadingInProgress = false;
+
   @override
   BlitzState build() {
-    // 初始状态：空列表、未加载
-    return const BlitzState();
+    // 初始状态：标记为加载中，由 UI 层 (BlitzPage) 的 initState 触发 loadPhotos()
+    return const BlitzState(isLoading: true);
   }
 
   /// 获取注入的数据库实例
@@ -72,7 +75,9 @@ class BlitzController extends Notifier<BlitzState> {
   /// 5. 更新 state
   Future<void> loadPhotos() async {
     // 防止重复加载
-    if (state.isLoading) return;
+    // 防止重复加载（使用独立标志而非 state.isLoading，避免与 build() 初始值冲突）
+    if (_loadingInProgress) return;
+    _loadingInProgress = true;
 
     state = state.copyWith(
       isLoading: true,
@@ -81,7 +86,9 @@ class BlitzController extends Notifier<BlitzState> {
 
     try {
       // ---- 1. 检查并请求相册权限 ----
+      print('[BlitzController] Step 1: 请求相册权限...');
       final permission = await PhotoManager.requestPermissionExtend();
+      print('[BlitzController] 权限结果: ${permission.isAuth}, 状态: $permission');
       if (!permission.isAuth) {
         state = state.copyWith(
           isLoading: false,
@@ -91,18 +98,19 @@ class BlitzController extends Notifier<BlitzState> {
       }
 
       // ---- 2. 获取"最近"相册中的照片 ----
-      // 为什么只取图片类型：闪电战模式专注于照片整理，视频在后续模式中处理
+      print('[BlitzController] Step 2: 获取相册列表...');
       final List<AssetPathEntity> albums = await PhotoManager.getAssetPathList(
         type: RequestType.image,
         filterOption: FilterOptionGroup(
           orders: [
             const OrderOption(
               type: OrderOptionType.createDate,
-              asc: false, // 最新的照片排在前面
+              asc: false,
             ),
           ],
         ),
       );
+      print('[BlitzController] 找到 ${albums.length} 个相册');
 
       if (albums.isEmpty) {
         state = state.copyWith(
@@ -114,21 +122,24 @@ class BlitzController extends Notifier<BlitzState> {
 
       // 取第一个相册（通常是"所有照片"/"最近项目"）
       final recentAlbum = albums.first;
+      print('[BlitzController] Step 3: 从相册 "${recentAlbum.name}" 加载照片...');
       final List<AssetEntity> rawPhotos = await recentAlbum.getAssetListPaged(
         page: 0,
         size: _fetchBatchSize,
       );
+      print('[BlitzController] 加载到 ${rawPhotos.length} 张原始照片');
 
       // ---- 3. 查询已处理过的照片 ID 集合 ----
-      // 为什么从数据库读取 Set 而不是逐条查询：
-      //   批量读取一次，O(1) 查找，比逐条 SELECT 高效得多。
+      print('[BlitzController] Step 4: 查询已处理照片...');
       final processedIds = await _getProcessedPhotoIds();
+      print('[BlitzController] 已处理 ${processedIds.length} 张');
 
       // ---- 4. 过滤去重：排除已经 Keep/Delete 过的照片 ----
       final unprocessedPhotos = rawPhotos
           .where((photo) => !processedIds.contains(photo.id))
           .take(_targetPhotoCount)
           .toList();
+      print('[BlitzController] 去重后剩余 ${unprocessedPhotos.length} 张未处理照片');
 
       // ---- 5. 更新状态 ----
       state = state.copyWith(
@@ -137,19 +148,21 @@ class BlitzController extends Notifier<BlitzState> {
         isLoading: false,
         errorMessage: () => null,
       );
-    } catch (e) {
+      print('[BlitzController] ✅ 加载完成!');
+    } catch (e, stackTrace) {
+      print('[BlitzController] ❌ 加载失败: $e\n$stackTrace');
       state = state.copyWith(
         isLoading: false,
         errorMessage: () => '加载照片失败: $e',
       );
+    } finally {
+      _loadingInProgress = false;
     }
   }
 
   /// 从 Drift 数据库读取所有已处理过的照片 Asset ID
   Future<Set<String>> _getProcessedPhotoIds() async {
-    final query = _db.select(_db.photoActions)
-      ..addColumns([_db.photoActions.id]);
-    final rows = await query.get();
+    final rows = await _db.select(_db.photoActions).get();
     return rows.map((row) => row.id).toSet();
   }
 

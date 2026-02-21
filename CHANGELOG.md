@@ -4,6 +4,23 @@
 
 ---
 
+## v0.2.1 — 2026-02-21
+
+### 🐛 闪电战模式 Bug 修复 & 稳定性优化
+
+#### 🔧 BlitzController 修复
+- **修复重复加载 Bug** — 新增独立防重入标志 `_loadingInProgress`，解决 `build()` 初始 `isLoading: true` 导致 `loadPhotos()` 无法触发的问题
+- **修复数据库查询** — 简化 `_getProcessedPhotoIds()` 的 Drift 查询语句，移除不必要的 `addColumns` 调用
+- **增加调试日志** — 在照片加载各阶段添加 `print` 日志输出，便于排查权限、相册、去重等环节问题
+- **异常堆栈追踪** — `catch` 块增加 `stackTrace` 捕获，提升错误排查能力
+
+#### 🛡️ BlitzPage 稳定性改进
+- **新增 `initState` 加载触发** — 通过 `addPostFrameCallback` 在首帧渲染后触发 `loadPhotos()`，避免在 widget 构建期间修改 Provider 状态
+- **新增错误信息展示 UI** — 当权限被拒或加载失败时，在屏幕上红字显示错误信息
+- **新增滑动越界安全检查** — 在 `onSwipeEnd` 和 `cardBuilder` 中添加索引边界检查，防止滑完最后一张后数组越界崩溃
+
+---
+
 ## v0.2.0 — 2026-02-21
 
 ### ✨ 搭建 Flutter 前端框架 & 实现闪电战核心功能
