@@ -147,6 +147,7 @@ class BlitzController extends Notifier<BlitzState> {
         currentIndex: 0,
         isLoading: false,
         errorMessage: () => null,
+        sessionDeletedPhotos: const [], // 初始化时清空本轮的暂存记录
       );
       print('[BlitzController] ✅ 加载完成!');
     } catch (e, stackTrace) {
@@ -188,12 +189,15 @@ class BlitzController extends Notifier<BlitzState> {
     }
 
     try {
-      // 1. 同步进行乐观状态更新：体力 -1，索引 +1，记录一次删除操作。
+      // 1. 同步进行乐观状态更新：体力 -1，索引 +1，记录并暂存删除照片。
       // 极其重要：务必在 awaits _db 操作之前更新 state，否则快速连滑会导致旧 state 被缓存从而丢失滑动进度。
       state = state.copyWith(
         currentEnergy: state.currentEnergy - 1.0,
         currentIndex: state.currentIndex + 1,
-        deletedCount: state.deletedCount + 1,
+        sessionDeletedPhotos: [
+          ...state.sessionDeletedPhotos,
+          photo
+        ], // 暂存到本轮待处决列表
         errorMessage: () => null,
       );
 

@@ -35,8 +35,11 @@ class BlitzState {
   /// 错误信息（null 表示无错误）
   final String? errorMessage;
 
-  /// 已左滑删除的照片计数
-  final int deletedCount;
+  /// 本次会话中已标记为删除的照片列表，用于结算页归档动效与统一处决
+  final List<AssetEntity> sessionDeletedPhotos;
+
+  /// 已左滑删除的照片计数 (通过列表长度获取)
+  int get deletedCount => sessionDeletedPhotos.length;
 
   const BlitzState({
     this.photos = const [],
@@ -44,7 +47,7 @@ class BlitzState {
     this.currentEnergy = 50.0,
     this.isLoading = false,
     this.errorMessage,
-    this.deletedCount = 0,
+    this.sessionDeletedPhotos = const [],
   });
 
   /// 便捷 getter：是否还有下一张照片可处理
@@ -66,7 +69,7 @@ class BlitzState {
     double? currentEnergy,
     bool? isLoading,
     String? Function()? errorMessage,
-    int? deletedCount,
+    List<AssetEntity>? sessionDeletedPhotos,
   }) {
     return BlitzState(
       photos: photos ?? this.photos,
@@ -75,7 +78,7 @@ class BlitzState {
       isLoading: isLoading ?? this.isLoading,
       // 使用 Function 包装 nullable 字段，区分"不更新"和"设为 null"
       errorMessage: errorMessage != null ? errorMessage() : this.errorMessage,
-      deletedCount: deletedCount ?? this.deletedCount,
+      sessionDeletedPhotos: sessionDeletedPhotos ?? this.sessionDeletedPhotos,
     );
   }
 

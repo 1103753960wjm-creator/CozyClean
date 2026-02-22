@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:appinio_swiper/appinio_swiper.dart';
+import 'package:photo_manager/photo_manager.dart';
+
 import '../controllers/blitz_controller.dart';
+import '../controllers/blitz_state.dart';
 import '../widgets/photo_card.dart';
 import 'summary_page.dart';
 
@@ -20,12 +23,12 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
   // 导航保险锁，避免同时触发监听器和插件的回调
   bool _isNavigating = false;
 
-  void _navigateToSummary(int deletedCount) {
+  void _navigateToSummary(List<AssetEntity> deleteSet) {
     if (_isNavigating) return;
     _isNavigating = true;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (context) => SummaryPage(deletedCount: deletedCount),
+        builder: (context) => SummaryPage(deleteSet: deleteSet),
       ),
     );
   }
@@ -57,7 +60,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
       if (!next.isLoading && next.photos.isNotEmpty && !next.hasNextPhoto) {
         // hasNextPhoto 为 false 意味着真正到达了末尾
         // 不必再校验 previous.hasNextPhoto（可能被连滑动画吞掉）
-        _navigateToSummary(next.deletedCount);
+        _navigateToSummary(next.sessionDeletedPhotos);
       }
     });
 
@@ -104,46 +107,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
 
           // 中间滑动主区
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              child: AppinioSwiper(
-                controller: _swiperController,
-                cardCount: state.photos.length,
-                onSwipeEnd: (int previousIndex, int targetIndex,
-                    SwiperActivity activity) {
-                  print(
-                      '[BlitzPage] onSwipeEnd triggered. prev: $previousIndex, target: $targetIndex, activity: ${activity.runtimeType}');
-                  // 安全边界检查：防止滑完最后一张后越界
-                  if (previousIndex < 0 ||
-                      previousIndex >= state.photos.length) {
-                    print('[BlitzPage] onSwipeEnd out of bounds. Ignoring.');
-                    return;
-                  }
-                  _handleSwipeEnd(
-                      activity, notifier, state.photos[previousIndex]);
-                },
-                onEnd: () {
-                  print(
-                      '[BlitzPage] onEnd triggered! deletedCount: ${state.deletedCount}');
-                  // 这个钩子在卡片组被彻底滑空时触发，作为双重保险
-                  _navigateToSummary(state.deletedCount);
-                },
-                // 卡片生成器
-                cardBuilder: (BuildContext context, int index) {
-                  // 安全边界检查：AppinioSwiper 可能请求超出范围的索引
-                  if (index < 0 || index >= state.photos.length) {
-                    return const SizedBox.shrink();
-                  }
-                  final photo = state.photos[index];
-                  final shouldLoad = notifier.shouldCacheImage(index);
-
-                  return PhotoCard(
-                    photo: photo,
-                    shouldLoadImage: shouldLoad,
-                  );
-                },
-              ),
-            ),
+            child: _buildSwiperContainer(state, notifier),
           ),
 
           // 底部操作按钮群
@@ -161,49 +125,31 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
     );
   }
 
-  /// 顶部数据大盘 (AppBar 替代)
+  /// 顶部数据大盘 (AppBar 替代) - 根据设计图重构为极简风格
   Widget _buildTopBar(
       BuildContext context, int currentIndex, int total, double energy) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // 进度指示
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('整理进度',
-                  style: TextStyle(color: Colors.black54, fontSize: 12)),
-              Text(
-                '${currentIndex + 1} / $total',
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                    color: Color(0xFF5D5D5D)),
-              ),
-            ],
+          // 左侧返回按钮
+          GestureDetector(
+            onTap: () => Navigator.maybePop(context),
+            child: const Text('← 返回',
+                style: TextStyle(
+                    color: Colors.black45,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500)),
           ),
-          // 剩余体能块
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE8F0E6), // 淡绿底色
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.bolt_rounded,
-                    color: Color(0xFF8BA888), size: 20), // 苔藓绿闪电
-                const SizedBox(width: 4),
-                Text(
-                  energy.toStringAsFixed(1),
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w600, color: Color(0xFF4A6B48)),
-                )
-              ],
-            ),
-          )
+          // 右侧标题
+          const Text(
+            '闪电战模式',
+            style: TextStyle(
+                color: Colors.black45,
+                fontSize: 16,
+                fontWeight: FontWeight.w500),
+          ),
         ],
       ),
     );
@@ -220,42 +166,121 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
     );
   }
 
-  /// 屏幕底部的大型控制按钮组 (左侧删除 ❌，右侧保留 ❤️)
+  /// 屏幕底部的极简文本操作按钮与左下方的撕纸撤销贴片
   Widget _buildActionButtons() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 30, top: 10, left: 40, right: 40),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          // 抛弃 / 删除按钮
-          _ActionButton(
-            icon: Icons.close_rounded,
-            color: const Color(0xFFE57373), // 柔和红
-            onTap: () {
-              // 触发手动左滑动画
-              _swiperController.swipeLeft();
-            },
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // 极简文本滑动手柄 (底部居中靠下)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10, top: 10), // 控制整体文本离底部的距离
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              GestureDetector(
+                onTap: () {
+                  _swiperController.swipeLeft();
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 30),
+                  child: Text(
+                    '丢弃',
+                    style: TextStyle(
+                      color: Colors.red[300]!.withOpacity(0.8),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 40),
+              GestureDetector(
+                onTap: () {
+                  _swiperController.swipeRight();
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 30),
+                  child: Text(
+                    '保留',
+                    style: TextStyle(
+                      color: const Color(0xFF8BA888).withOpacity(0.8),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-          // 喜欢 / 保留按钮
-          _ActionButton(
-            icon: Icons.favorite_rounded,
-            color: const Color(0xFF8BA888), // 苔藓绿
+        ),
+
+        // 撕纸贴片风的悬浮撤销按钮 (左侧靠下悬浮，抬高防重叠)
+        Positioned(
+          left: 20,
+          bottom: 80, // 从 10 大幅抬升，彻底脱开下方文本的安全距离
+          child: GestureDetector(
             onTap: () {
-              // 触发手动右滑动画
-              _swiperController.swipeRight();
+              // 触发控制器防呆撤销，如果不能撤销则无反应
+              _swiperController.unswipe();
+              // 在 controller 层级我们可以添加自己的弹回逻辑或音效
+              HapticFeedback.lightImpact();
             },
+            child: Transform.rotate(
+              angle: -0.05, // 微微倾斜更加随意
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 8), // 缩小内边距
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0EBE2), // 泛黄的裁纸色
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 4,
+                      offset: const Offset(2, 2),
+                    ),
+                  ],
+                  // 使用一点非对称圆角模拟胶带撕下的痕迹
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(2),
+                    bottomLeft: Radius.circular(8),
+                    topRight: Radius.circular(8),
+                    bottomRight: Radius.circular(2),
+                  ),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.replay_rounded,
+                      color: Colors.black45,
+                      size: 14, // 缩小图标
+                    ),
+                    SizedBox(width: 4),
+                    Text(
+                      '撤销',
+                      style: TextStyle(
+                        color: Colors.black54,
+                        fontSize: 14, // 缩小字号
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   /// 封装 Swiper 卡片滑动后的通用回调事件分析
   void _handleSwipeEnd(
       SwiperActivity activity, dynamic notifier, dynamic photo) {
-    print('[BlitzPage] _handleSwipeEnd: activity=$activity');
     if (activity is Swipe) {
-      print('[BlitzPage] Activity IS Swipe. Direction: ${activity.direction}');
       if (activity.direction == AxisDirection.left) {
         // 左滑 (删除 - 较重力反馈)
         HapticFeedback.mediumImpact();
@@ -265,46 +290,52 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
         HapticFeedback.lightImpact();
         notifier.swipeRight(photo);
       }
-    } else {
-      print('[BlitzPage] Activity is NOT Swipe.');
     }
   }
-}
 
-/// 底部圆形操作悬浮按钮的 UI 封装
-class _ActionButton extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
+  /// 剥离构建滑动核心区域
+  Widget _buildSwiperContainer(BlitzState state, BlitzController notifier) {
+    return Center(
+      // 关键修复：加入 AspectRatio 防止被 Expanded 拉扯变形
+      // 强制 0.8 比例，恢复竖版拍立得真实的稍微“胖宽”感
+      child: AspectRatio(
+        aspectRatio: 0.80,
+        child: Padding(
+          // 极大地拉升下部屏障距离（bottom: 110），强行顶起缩小卡片避免任何元素盖住
+          padding: const EdgeInsets.only(left: 30, right: 30, bottom: 110),
+          child: AppinioSwiper(
+            controller: _swiperController,
+            cardCount: state.photos.length,
+            // 【关键重设】增强底部卡片层次错落感
+            backgroundCardCount: 2, // 渲染底部露出来的两张卡片（不含顶层，合计看到 3 层厚度）
+            backgroundCardScale: 0.92, // 底下卡片的缩放比例，差异越大越有梯度感
+            backgroundCardOffset: const Offset(0, 15), // 强制让底下的图层向下偏移，模仿相册厚度
+            onSwipeEnd:
+                (int previousIndex, int targetIndex, SwiperActivity activity) {
+              if (previousIndex < 0 || previousIndex >= state.photos.length) {
+                return;
+              }
+              _handleSwipeEnd(activity, notifier, state.photos[previousIndex]);
+            },
+            onEnd: () {
+              _navigateToSummary(state.sessionDeletedPhotos);
+            },
+            cardBuilder: (BuildContext context, int index) {
+              if (index < 0 || index >= state.photos.length) {
+                return const SizedBox.shrink();
+              }
+              final photo = state.photos[index];
+              final shouldLoad = notifier.shouldCacheImage(index);
 
-  const _ActionButton({
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(40),
-      // Splash 回馈
-      splashColor: color.withOpacity(0.2),
-      child: Container(
-        height: 70,
-        width: 70,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.15),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
-            ),
-          ],
+              return PhotoCard(
+                photo: photo,
+                shouldLoadImage: shouldLoad,
+                swiperController: _swiperController,
+                index: index,
+              );
+            },
+          ),
         ),
-        child: Icon(icon, color: color, size: 36),
       ),
     );
   }

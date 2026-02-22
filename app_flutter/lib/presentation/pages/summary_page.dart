@@ -1,37 +1,214 @@
+import 'dart:typed_data';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:confetti/confetti.dart';
+import 'package:photo_manager/photo_manager.dart';
 
 /// 总结算动画页面 (Summary Page)
+/// 包含：极具仪式感的信封归档打包动画 + 系统级底层一键批量删除 + Confetti 结算
 class SummaryPage extends StatefulWidget {
-  final int deletedCount;
+  final List<AssetEntity> deleteSet;
 
-  const SummaryPage({Key? key, required this.deletedCount}) : super(key: key);
+  const SummaryPage({Key? key, required this.deleteSet}) : super(key: key);
 
   @override
   State<SummaryPage> createState() => _SummaryPageState();
 }
 
-class _SummaryPageState extends State<SummaryPage> {
-  late ConfettiController _confettiController;
+class _SummaryPageState extends State<SummaryPage>
+    with TickerProviderStateMixin {
+  // --- 动效控制器 ---
+  late AnimationController _envelopeAnimCtrl;
 
-  // 按照 PRD 假设：平均每张照片可节省 3.0 MB 空间
+  late List<Animation<Offset>> _photosSlideAnims;
+  late List<Animation<double>> _photosScaleAnims;
+  late List<Animation<double>> _photosRotateAnims;
+
+  late Animation<double> _flapRotateAnim;
+  late Animation<double> _sealScaleAnim;
+  late Animation<double> _sealOpacityAnim;
+  late Animation<double> _envelopeBumpAnim;
+
+  // --- 状态流转标识 ---
+  late ConfettiController _confettiController;
+  bool _isDeleting = false;
+  bool _deleteFinished = false;
+  int _actualDeletedCount = 0;
+  String? _errorMessage;
+
+  // 假设常量：每张照片预计节省空间
   static const double _savingsPerPhotoMb = 3.0;
 
   @override
   void initState() {
     super.initState();
-    // 初始化五彩纸屑控制器，持续喷射 2 秒
     _confettiController =
         ConfettiController(duration: const Duration(seconds: 2));
 
-    // 渲染第一帧后立刻触发动画
+    // 强制初始化所有的动画，防止在空数据下层 build 报错 LateInitializationError
+    _initAnimations();
+
+    // 如果压根没有待删项目，直接跳过动画包进入最终结算状态
+    if (widget.deleteSet.isEmpty) {
+      _deleteFinished = true;
+      return;
+    }
+
+    // 第一帧绘制完成后，立刻播放打包动画
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _confettiController.play();
+      _envelopeAnimCtrl.forward();
     });
+  }
+
+  void _initAnimations() {
+    _envelopeAnimCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1500));
+
+    _photosSlideAnims = [];
+    _photosScaleAnims = [];
+    _photosRotateAnims = [];
+
+    // Phase 1: 0.0 - 0.5 照片交错飞入
+    int photoCount = widget.deleteSet.take(3).length;
+    for (int i = 0; i < photoCount; i++) {
+      double start = i * 0.1;
+      double end = start + 0.3;
+
+      // 生成三个不同的抛物线起点
+      double startX = (i == 0) ? -1.0 : (i == 2 ? 1.0 : 0.0);
+
+      _photosSlideAnims.add(Tween<Offset>(
+              begin: Offset(startX, -1.5), end: const Offset(0.0, 0.0))
+          .animate(
+        CurvedAnimation(
+          parent: _envelopeAnimCtrl,
+          curve: Interval(start, end, curve: Curves.easeInCubic),
+        ),
+      ));
+
+      _photosScaleAnims.add(Tween<double>(begin: 1.2, end: 0.4).animate(
+        CurvedAnimation(
+          parent: _envelopeAnimCtrl,
+          curve: Interval(start, end, curve: Curves.easeOut),
+        ),
+      ));
+
+      _photosRotateAnims
+          .add(Tween<double>(begin: (i - 1) * 0.6, end: (i - 1) * 0.15).animate(
+        CurvedAnimation(
+          parent: _envelopeAnimCtrl,
+          curve: Interval(start, end, curve: Curves.easeInOut),
+        ),
+      ));
+    }
+
+    // Phase 2: 0.5 - 0.8 信封盖 3D 合拢
+    _flapRotateAnim = Tween<double>(begin: -math.pi, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _envelopeAnimCtrl,
+        curve: const Interval(0.5, 0.8, curve: Curves.easeInOutBack),
+      ),
+    );
+
+    // Phase 3: 0.8 - 1.0 火漆印章重重砸下
+    _sealOpacityAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _envelopeAnimCtrl,
+        curve: const Interval(0.8, 0.85, curve: Curves.easeIn),
+      ),
+    );
+    _sealScaleAnim = Tween<double>(begin: 3.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _envelopeAnimCtrl,
+        curve: const Interval(0.8, 1.0, curve: Curves.elasticOut),
+      ),
+    );
+
+    // Phase 4: 0.8 - 1.0 伴随印章砸下的全局应力震荡 (Bump)
+    _envelopeBumpAnim = TweenSequence<double>([
+      TweenSequenceItem(
+          tween: Tween<double>(begin: 0.0, end: 15.0)
+              .chain(CurveTween(curve: Curves.easeOut)),
+          weight: 1),
+      TweenSequenceItem(
+          tween: Tween<double>(begin: 15.0, end: -5.0)
+              .chain(CurveTween(curve: Curves.easeInOut)),
+          weight: 1),
+      TweenSequenceItem(
+          tween: Tween<double>(begin: -5.0, end: 0.0)
+              .chain(CurveTween(curve: Curves.elasticOut)),
+          weight: 2),
+    ]).animate(
+      CurvedAnimation(
+        parent: _envelopeAnimCtrl,
+        curve: const Interval(0.8, 1.0), // 修复越界：Flutter 规定 end 必须 <= 1.0
+      ),
+    );
+
+    // 监听动画完成事件，一旦封装完毕，无缝衔接触发真实批量删除
+    _envelopeAnimCtrl.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _executeBulkDelete();
+      }
+    });
+  }
+
+  /// 核心底层删除逻辑
+  Future<void> _executeBulkDelete() async {
+    setState(() {
+      _isDeleting = true;
+    });
+
+    try {
+      final idsToDelete = widget.deleteSet.map((e) => e.id).toList();
+      print('[SummaryPage] 发起系统级批量物理删除: ${idsToDelete.length} 张');
+
+      // 强行清理 Flutter 引擎内的 Image 文件缓存，防止由于上一个页面的 Image.file 未释放导致 FD 文件句柄占用
+      PaintingBinding.instance.imageCache.clear();
+      PaintingBinding.instance.imageCache.clearLiveImages();
+
+      // 让 PhotoManager 也丢弃在临时沙盒产生的缓存副本
+      await PhotoManager.clearFileCache();
+
+      // 小睡 300ms 避免由于 GC 处理文件句柄不够及时引发 Android File Busy
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // 这句代码将调用系统级权限弹框 (iOS/Android) 询问用户是否允许删除
+      final deletedList = await PhotoManager.editor.deleteWithIds(idsToDelete);
+
+      print('[SummaryPage] 物理删除结果: $deletedList');
+
+      if (!mounted) return;
+
+      if (deletedList.isNotEmpty) {
+        _actualDeletedCount = deletedList.length;
+        _deleteFinished = true;
+        _confettiController.play(); // 播撒欢乐纸屑
+      } else {
+        // 用户拒绝了弹窗授权或系统内部失败
+        _errorMessage = '操作被取消或没删除成功 (deletedList 为空)';
+        print(
+            '[SummaryPage] 错误: deletedList is empty, possibly user cancelled or ETXTBSY');
+        _deleteFinished = true;
+      }
+    } catch (e, stack) {
+      print('[SummaryPage] 捕捉到异常: $e');
+      print(stack);
+      if (!mounted) return;
+      _errorMessage = '发生系统异常: $e';
+      _deleteFinished = true;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDeleting = false;
+        });
+      }
+    }
   }
 
   @override
   void dispose() {
+    _envelopeAnimCtrl.dispose();
     _confettiController.dispose();
     super.dispose();
   }
@@ -39,121 +216,361 @@ class _SummaryPageState extends State<SummaryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF9F6), // 温暖手账风纸张白底
+      backgroundColor: const Color(0xFFFAF9F6), // 手账风
       body: Stack(
         children: [
-          SafeArea(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Spacer(flex: 2),
+          // ====================
+          // 1. 底层：打包动画区
+          // ====================
+          if (!_deleteFinished && _errorMessage == null)
+            Center(
+              child: _buildEnvelopeAnimation(),
+            ),
 
-                // 顶部 Emoji
-                const Text(
-                  '✨',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 72),
+          // ====================
+          // 2. 顶层：最终结算面板 (包含成功/取消/失败的状态兜底)
+          // ====================
+          if (_deleteFinished) ...[
+            _buildResultContent(),
+            // 顶层挂载喷射器
+            Align(
+              alignment: Alignment.topCenter,
+              child: ConfettiWidget(
+                confettiController: _confettiController,
+                blastDirectionality: BlastDirectionality.explosive,
+                shouldLoop: false,
+                colors: const [
+                  Color(0xFF8BA888),
+                  Color(0xFFE57373),
+                  Color(0xFFFFD54F),
+                  Color(0xFF81D4FA),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// 信封仪式的组合动画栈
+  Widget _buildEnvelopeAnimation() {
+    return AnimatedBuilder(
+      animation: _envelopeAnimCtrl,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(0, _envelopeBumpAnim.value),
+          child: Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              // A. 信封后衬底 (底层纸袋) + 内阴影模拟袋口
+              Container(
+                width: 200,
+                height: 140,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFC4A484), // 深牛皮纸色
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black12,
+                      offset: Offset(0, 5),
+                      blurRadius: 15,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-
-                // 庆祝文案
-                const Text(
-                  '清理完成！',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF4A6B48), // 苔藓绿深色
+                alignment: Alignment.topCenter,
+                // 袋口阴影遮罩
+                child: Container(
+                  height: 20,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withOpacity(0.2),
+                        Colors.transparent,
+                      ],
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(8),
+                      topRight: Radius.circular(8),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 48),
+              ),
 
-                // 数据面板卡片
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 40),
+              // B. 交错飞入的照片们
+              // 避免在 widget.deleteSet.isEmpty 的情况下强行渲染可能出错
+              if (widget.deleteSet.isNotEmpty) ..._buildAnimatedThumbnails(),
+
+              // C1. 信封前包体 (底层不动)
+              Positioned(
+                bottom: 0,
+                child: Container(
+                  width: 200,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD7BFA6),
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(8),
+                      bottomRight: Radius.circular(8),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.15),
+                        blurRadius: 12,
+                        offset: const Offset(0, -4),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // C2. 3D 信封顶盖翻折 (铰链在 top: 40)
+              Positioned(
+                top: 40,
+                child: Transform(
+                  alignment: Alignment.topCenter,
+                  transform: Matrix4.identity()
+                    ..setEntry(3, 2, 0.002) // 3D 透视视效
+                    ..rotateX(_flapRotateAnim.value),
                   child: Container(
-                    padding: const EdgeInsets.all(30),
+                    height: 80,
+                    width: 200,
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF8BA888).withOpacity(0.15),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        _buildStatRow(
-                          label: '清理照片',
-                          targetValue: widget.deletedCount.toDouble(),
-                          suffix: '张',
-                          isFloat: false,
-                        ),
-                        const SizedBox(height: 20),
-                        const Divider(color: Color(0xFFE8F0E6), thickness: 1.5),
-                        const SizedBox(height: 20),
-                        _buildStatRow(
-                          label: '预估节省',
-                          targetValue: widget.deletedCount * _savingsPerPhotoMb,
-                          suffix: 'MB',
-                          isFloat: true,
-                          highlight: true,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const Spacer(flex: 3),
-
-                // 底部胶囊按钮
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // 这里暂时是 popUntil 退回入口。后续如接入更复杂的路由（如 GoRouter），可替换跳转行为
-                      Navigator.of(context).popUntil((route) => route.isFirst);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF8BA888), // 苔藓绿
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                      elevation: 4,
-                      shadowColor: const Color(0xFF8BA888).withOpacity(0.4),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
+                      color: const Color(0xFFD7BFA6),
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(40),
+                        bottomRight: Radius.circular(40),
+                      ),
+                      border: Border.all(
+                        color: Colors.black.withOpacity(0.05),
+                        width: 1,
                       ),
                     ),
-                    child: const Text(
-                      '太棒了！返回首页',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+
+              // D. 火漆印章砸下封印 (顶层缩放)
+              if (_envelopeAnimCtrl.value > 0.75)
+                Positioned(
+                  top: 90,
+                  child: Transform.scale(
+                    scale: _sealScaleAnim.value,
+                    child: Opacity(
+                      opacity: _sealOpacityAnim.value,
+                      child: Container(
+                        width: 55,
+                        height: 55,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFB54B4B), // 暗红色火漆
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              // 泛光环境阴影
+                              color: const Color(0xFFB54B4B).withOpacity(0.6),
+                              blurRadius: 12,
+                              offset: const Offset(0, 6),
+                            ),
+                            BoxShadow(
+                              // 锐利实体重心阴影
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.check_rounded,
+                          color: Colors.white,
+                          size: 32,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ],
+
+              // 正在呼叫系统删除时的菊花 Loading
+              if (_isDeleting)
+                const Positioned(
+                  bottom: -60,
+                  child: Text(
+                    '系统删除确认中...',
+                    style: TextStyle(color: Colors.black45, fontSize: 14),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// 构建交替飘落的缩略图列表
+  List<Widget> _buildAnimatedThumbnails() {
+    final previewPhotos = widget.deleteSet.take(3).toList();
+    if (previewPhotos.isEmpty || _photosSlideAnims.isEmpty) return [];
+
+    return List.generate(previewPhotos.length, (index) {
+      final photo = previewPhotos[index];
+      // 防止越界（动效数组以长度生成）
+      if (index >= _photosSlideAnims.length) return const SizedBox.shrink();
+
+      return Transform.translate(
+        // x 轴使用系数，y 轴 * 250 是高度掉落距离
+        offset: Offset(_photosSlideAnims[index].value.dx * 80,
+            _photosSlideAnims[index].value.dy * 250),
+        child: Transform.scale(
+          scale: _photosScaleAnims[index].value,
+          child: Transform.rotate(
+            angle: _photosRotateAnims[index].value,
+            child: Container(
+              width: 120,
+              height: 160,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white, width: 4),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black12,
+                    blurRadius: 8,
+                    offset: Offset(4, 4),
+                  )
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: FutureBuilder<Uint8List?>(
+                  future: photo
+                      .thumbnailDataWithSize(const ThumbnailSize.square(300)),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData && snapshot.data != null) {
+                      return Image.memory(
+                        snapshot.data!,
+                        fit: BoxFit.cover,
+                      );
+                    }
+                    return Container(color: Colors.grey[200]);
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    });
+  }
+
+  /// 构建最终展现结果（胜利结算 / 失败提示）
+  Widget _buildResultContent() {
+    final bool isSuccess = _actualDeletedCount > 0 && _errorMessage == null;
+
+    return SafeArea(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Spacer(flex: 2),
+
+          // 顶部 Emoji
+          Text(
+            isSuccess ? '✨' : '😅',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 72),
+          ),
+          const SizedBox(height: 16),
+
+          // 庆祝/提示文案
+          Text(
+            isSuccess ? '清理完成！' : '清理已被中止',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: isSuccess ? const Color(0xFF4A6B48) : Colors.black54,
             ),
           ),
 
-          // 位于顶层的纸屑发射器控件 (从屏幕顶部中间向四周喷洒)
-          Align(
-            alignment: Alignment.topCenter,
-            child: ConfettiWidget(
-              confettiController: _confettiController,
-              blastDirectionality: BlastDirectionality.explosive, // 爆炸性全向喷射
-              shouldLoop: false,
-              colors: const [
-                Color(0xFF8BA888), // 苔藓绿
-                Color(0xFFE57373), // 柔和红
-                Color(0xFFFFD54F), // 温暖黄
-                Color(0xFF81D4FA), // 浅蓝
-              ],
-              createParticlePath: _drawStar, // 画小星星
+          if (!isSuccess) ...[
+            const SizedBox(height: 12),
+            Text(
+              _errorMessage ?? '未做任何修改',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.redAccent, fontSize: 14),
+            ),
+          ],
+
+          const SizedBox(height: 48),
+
+          // 无论成功失败，只要有数字都会展示
+          if (isSuccess)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Container(
+                padding: const EdgeInsets.all(30),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF8BA888).withOpacity(0.15),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    _buildStatRow(
+                      label: '真实清理',
+                      targetValue: _actualDeletedCount.toDouble(),
+                      suffix: '张',
+                      isFloat: false,
+                    ),
+                    const SizedBox(height: 20),
+                    const Divider(color: Color(0xFFE8F0E6), thickness: 1.5),
+                    const SizedBox(height: 20),
+                    _buildStatRow(
+                      label: '预估释放',
+                      targetValue: _actualDeletedCount * _savingsPerPhotoMb,
+                      suffix: 'MB',
+                      isFloat: true,
+                      highlight: true,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          const Spacer(flex: 3),
+
+          // 底部胶囊按钮
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor:
+                    isSuccess ? const Color(0xFF8BA888) : Colors.grey[400],
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                elevation: 4,
+                shadowColor: (isSuccess ? const Color(0xFF8BA888) : Colors.grey)
+                    .withOpacity(0.4),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+              ),
+              child: Text(
+                isSuccess ? '太棒了！返回首页' : '明白了，返回首页',
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
             ),
           ),
         ],
@@ -180,14 +597,12 @@ class _SummaryPageState extends State<SummaryPage> {
             fontWeight: FontWeight.w500,
           ),
         ),
-
         // 使用 Flutter 原生 TweenAnimationBuilder 驱动数字滚动动画
         TweenAnimationBuilder<double>(
           tween: Tween<double>(begin: 0, end: targetValue),
           duration: const Duration(seconds: 2),
           curve: Curves.easeOutCubic,
           builder: (context, value, child) {
-            // 根据参数决定是否保留小数点
             final displayStr =
                 isFloat ? value.toStringAsFixed(1) : value.toInt().toString();
             return RichText(
@@ -220,27 +635,5 @@ class _SummaryPageState extends State<SummaryPage> {
         ),
       ],
     );
-  }
-
-  /// 为纸屑绘制定制的星星形状
-  Path _drawStar(Size size) {
-    double degToRad(double deg) => deg * (3.1415926535897932 / 180.0);
-    const numberOfPoints = 5;
-    final halfWidth = size.width / 2;
-    final externalRadius = halfWidth;
-    final degreesPerStep = degToRad(360 / numberOfPoints);
-    final path = Path();
-    final fullAngle = degToRad(360);
-    path.moveTo(size.width, halfWidth);
-    for (double step = 0; step < fullAngle; step += degreesPerStep) {
-      path.lineTo(halfWidth + externalRadius * 1 /*cos*/,
-          halfWidth + externalRadius * 0 /*sin*/);
-      // 省略精确星星三角数学路径以保证性能，采用简易多边形纸屑
-      // 在实际生产中只需简单闭合即可
-    }
-    path.addOval(Rect.fromCircle(
-        center: Offset(halfWidth, halfWidth), radius: size.width / 2));
-    path.close();
-    return path;
   }
 }
