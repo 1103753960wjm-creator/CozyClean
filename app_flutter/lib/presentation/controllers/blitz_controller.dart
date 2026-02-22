@@ -129,21 +129,21 @@ class BlitzController extends Notifier<BlitzState> {
       );
       print('[BlitzController] 加载到 ${rawPhotos.length} 张原始照片');
 
-      // ---- 3. 查询已处理过的照片 ID 集合 ----
-      print('[BlitzController] Step 4: 查询已处理照片...');
-      final processedIds = await _getProcessedPhotoIds();
-      print('[BlitzController] 已处理 ${processedIds.length} 张');
+      // ---- 3. 查询已删除的照片 ID 集合 ----
+      print('[BlitzController] Step 4: 查询已删除照片...');
+      final deletedIds = await _getDeletedPhotoIds();
+      print('[BlitzController] 已删除 ${deletedIds.length} 张');
 
-      // ---- 4. 过滤去重：排除已经 Keep/Delete 过的照片 ----
-      final unprocessedPhotos = rawPhotos
-          .where((photo) => !processedIds.contains(photo.id))
+      // ---- 4. 过滤：仅排除已标记删除的照片，保留的照片继续显示 ----
+      final availablePhotos = rawPhotos
+          .where((photo) => !deletedIds.contains(photo.id))
           .take(_targetPhotoCount)
           .toList();
-      print('[BlitzController] 去重后剩余 ${unprocessedPhotos.length} 张未处理照片');
+      print('[BlitzController] 可显示 ${availablePhotos.length} 张照片');
 
       // ---- 5. 更新状态 ----
       state = state.copyWith(
-        photos: unprocessedPhotos,
+        photos: availablePhotos,
         currentIndex: 0,
         isLoading: false,
         errorMessage: () => null,
@@ -160,9 +160,12 @@ class BlitzController extends Notifier<BlitzState> {
     }
   }
 
-  /// 从 Drift 数据库读取所有已处理过的照片 Asset ID
-  Future<Set<String>> _getProcessedPhotoIds() async {
-    final rows = await _db.select(_db.photoActions).get();
+  /// 从 Drift 数据库读取所有已标记为"删除"的照片 Asset ID
+  /// 只排除 actionType=1 (Delete) 的照片，保留 actionType=0 (Keep) 的照片仍然可查看
+  Future<Set<String>> _getDeletedPhotoIds() async {
+    final rows = await (_db.select(_db.photoActions)
+          ..where((t) => t.actionType.equals(1)))
+        .get();
     return rows.map((row) => row.id).toSet();
   }
 
@@ -185,24 +188,24 @@ class BlitzController extends Notifier<BlitzState> {
     }
 
     try {
-      // 写入 Drift 数据库：actionType = 1 代表 Delete
+      // 1. 同步进行乐观状态更新：体力 -1，索引 +1，记录一次删除操作。
+      // 极其重要：务必在 awaits _db 操作之前更新 state，否则快速连滑会导致旧 state 被缓存从而丢失滑动进度。
+      state = state.copyWith(
+        currentEnergy: state.currentEnergy - 1.0,
+        currentIndex: state.currentIndex + 1,
+        deletedCount: state.deletedCount + 1,
+        errorMessage: () => null,
+      );
+
+      // 2. 异步写入 Drift 数据库：actionType = 1 代表 Delete
       await _db.into(_db.photoActions).insertOnConflictUpdate(
             PhotoActionsCompanion.insert(
               id: photo.id,
               actionType: 1, // Delete
             ),
           );
-
-      // 更新状态：体力 -1，索引 +1
-      state = state.copyWith(
-        currentEnergy: state.currentEnergy - 1.0,
-        currentIndex: state.currentIndex + 1,
-        errorMessage: () => null,
-      );
     } catch (e) {
-      state = state.copyWith(
-        errorMessage: () => '操作失败: $e',
-      );
+      print('数据库写入报错：$e');
     }
   }
 
@@ -218,24 +221,22 @@ class BlitzController extends Notifier<BlitzState> {
     }
 
     try {
-      // 写入 Drift 数据库：actionType = 0 代表 Keep
+      // 1. 同步进行乐观状态更新
+      state = state.copyWith(
+        currentEnergy: state.currentEnergy - 1.0,
+        currentIndex: state.currentIndex + 1,
+        errorMessage: () => null,
+      );
+
+      // 2. 异步写入 Drift 数据库：actionType = 0 代表 Keep
       await _db.into(_db.photoActions).insertOnConflictUpdate(
             PhotoActionsCompanion.insert(
               id: photo.id,
               actionType: 0, // Keep
             ),
           );
-
-      // 更新状态：体力 -1，索引 +1
-      state = state.copyWith(
-        currentEnergy: state.currentEnergy - 1.0,
-        currentIndex: state.currentIndex + 1,
-        errorMessage: () => null,
-      );
     } catch (e) {
-      state = state.copyWith(
-        errorMessage: () => '操作失败: $e',
-      );
+      print('数据库写入报错：$e');
     }
   }
 
