@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-// 引入我们刚刚写好的闪电战页面
-import 'presentation/pages/blitz_page.dart';
+// 引入我们的核心首页与闪电战
+import 'presentation/pages/dashboard_page.dart';
 
 void main() {
   // runApp 是 Flutter 程序的绝对起点
@@ -25,11 +25,12 @@ class CozyCleanApp extends StatelessWidget {
       theme: ThemeData(
         // 植入 PRD 规定的核心色板
         primaryColor: const Color(0xFFF5F5DC),
-        scaffoldBackgroundColor: const Color(0xFFF5F5DC), // 奶油底色
+        scaffoldBackgroundColor:
+            const Color(0xFFFAF9F6), // 符合 Dashboard 原型的手账底色
         useMaterial3: true,
       ),
-      // 将 App 的启动首页强制指向闪电战页面
-      home: const BlitzPage(),
+      // 将 App 的启动首页平滑过渡到手账风的主仪表盘 (Dashboard)
+      home: const DashboardPage(),
     );
   }
 }

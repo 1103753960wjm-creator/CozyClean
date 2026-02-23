@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:appinio_swiper/appinio_swiper.dart';
@@ -18,35 +18,42 @@ class PhotoCard extends StatefulWidget {
   final int index;
 
   const PhotoCard({
-    Key? key,
+    super.key,
     required this.photo,
     required this.shouldLoadImage,
     this.swiperController,
     required this.index,
-  }) : super(key: key);
+  });
 
   @override
   State<PhotoCard> createState() => _PhotoCardState();
 }
 
 class _PhotoCardState extends State<PhotoCard> {
-  // 缓存图片文件获取的 Future，防止组件由于父级重建或位移偏量更新导致 FutureBuilder 多次触发
-  Future<File?>? _imageFileFuture;
+  /// 缓存图片字节流的 Future，防止组件由于父级重建导致 FutureBuilder 多次触发
+  Future<Uint8List?>? _imageDataFuture;
 
   @override
   void initState() {
     super.initState();
     if (widget.shouldLoadImage) {
-      _imageFileFuture = widget.photo.file;
+      // 不再使用耗时高且需要磁盘 File 锁的 .file 获取原图，而是直接向原生端索要内存中的高清缩略图数据！
+      // 尺寸可以依据卡片自身大小 (例如 800 * 800) 来平衡画质和光速加载的需求
+      _imageDataFuture =
+          widget.photo.thumbnailDataWithSize(const ThumbnailSize(800, 800));
     }
   }
 
   @override
   void didUpdateWidget(covariant PhotoCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // 重用机制：如果当前分配的照片变更，更新缓存
-    if (oldWidget.photo.id != widget.photo.id && widget.shouldLoadImage) {
-      _imageFileFuture = widget.photo.file;
+    // 重用机制：
+    // 1. 照片发生了根本的更换（id 改变），且应当加载； 或者
+    // 2. 照片实例因为挂载了 ValueKey 未被销毁重建，由于滑近使得 shouldLoadImage 从 false 变为了 true
+    if ((oldWidget.photo.id != widget.photo.id && widget.shouldLoadImage) ||
+        (!oldWidget.shouldLoadImage && widget.shouldLoadImage)) {
+      _imageDataFuture =
+          widget.photo.thumbnailDataWithSize(const ThumbnailSize(800, 800));
     }
   }
 
@@ -98,10 +105,11 @@ class _PhotoCardState extends State<PhotoCard> {
             child: Text(
               '宝宝的第一步', // 暂时写死，后续可根据日期或主题生成
               style: TextStyle(
+                fontFamily: 'Caveat', // 也可以用系统自带斜体
+                fontStyle: FontStyle.italic,
                 fontSize: 18,
-                color: Colors.brown.withOpacity(0.6),
-                fontWeight: FontWeight.w400,
-                letterSpacing: 2,
+                color: Colors.black87.withOpacity(0.7),
+                letterSpacing: 2.0,
               ),
             ),
           )
@@ -112,12 +120,12 @@ class _PhotoCardState extends State<PhotoCard> {
 
   /// 构建主要的图片渲染层
   Widget _buildImageLayer() {
-    if (!widget.shouldLoadImage || _imageFileFuture == null) {
+    if (!widget.shouldLoadImage || _imageDataFuture == null) {
       return _buildSkeleton();
     }
 
-    return FutureBuilder<File?>(
-      future: _imageFileFuture,
+    return FutureBuilder<Uint8List?>(
+      future: _imageDataFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return _buildSkeleton(); // 骨架加载屏
@@ -130,10 +138,10 @@ class _PhotoCardState extends State<PhotoCard> {
           decoration: BoxDecoration(
             border: Border.all(color: Colors.black.withOpacity(0.05), width: 1),
           ),
-          child: Image.file(
+          child: Image.memory(
             snapshot.data!,
             fit: BoxFit.cover,
-            // 关闭 gaplessPlayback 以便能正常过渡
+            // 绝杀闪烁选项：重用缓冲或无缝过渡接合，在 Flutter 层级直接截断任何渲染白帧
             gaplessPlayback: true,
           ),
         );
@@ -154,6 +162,8 @@ class _PhotoCardState extends State<PhotoCard> {
         final double dx = widget.swiperController!.swipeProgress!.dx;
         if (dx == 0) return const SizedBox.shrink();
 
+        // 经实测，AppinioSwiper 底层返回的 dx 本身已经是归一化参数 / 小比例数！
+        // 故之前除以(屏幕一半)反而导致透明度无限趋近于 0 看不见！直接乘以倍率即可！
         final double opacity = (dx.abs() * 1.5).clamp(0.0, 1.0);
         final bool isDiscard = dx < 0;
 

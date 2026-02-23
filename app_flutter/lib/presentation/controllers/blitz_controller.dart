@@ -264,14 +264,17 @@ class BlitzController extends Notifier<BlitzState> {
   ///
   /// 为什么预加载后 2 张：
   ///   用户快速滑动时，至少有 2 张照片已经在内存中，
-  ///   避免滑动到下一张时出现白屏/loading 闪烁。
+  /// 判定某张卡片是否应当触发实际加载 (防 OOM 策略)
   ///
-  /// 为什么不缓存更多：
-  ///   手机内存有限，原图可能每张 3-10MB，缓存 4 张约 12-40MB。
-  ///   超过这个范围性价比急剧下降，还会触发系统内存警告。
+  /// 规则：
+  /// 保留前 1 张 (备用撤销)，以及当前显示的卡片，和紧接着的后续 3 张卡片。
+  /// 其他处于更深处的卡片只渲染空骨架屏 (Skeleton)。
   bool shouldCacheImage(int index) {
+    if (state.photos.isEmpty) return false;
+
     final lower = state.currentIndex - 1;
-    final upper = state.currentIndex + 2;
+    final upper = state.currentIndex + 3; // 深度延伸至后 3 张
+
     return index >= lower && index <= upper;
   }
 }

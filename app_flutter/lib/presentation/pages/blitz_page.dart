@@ -5,13 +5,12 @@ import 'package:appinio_swiper/appinio_swiper.dart';
 import 'package:photo_manager/photo_manager.dart';
 
 import '../controllers/blitz_controller.dart';
-import '../controllers/blitz_state.dart';
 import '../widgets/photo_card.dart';
 import 'summary_page.dart';
 
 /// 闪电战核心展示主页
 class BlitzPage extends ConsumerStatefulWidget {
-  const BlitzPage({Key? key}) : super(key: key);
+  const BlitzPage({super.key});
 
   @override
   ConsumerState<BlitzPage> createState() => _BlitzPageState();
@@ -50,22 +49,31 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
 
   @override
   Widget build(BuildContext context) {
-    // 监听 Blitz 模式的核心状态
-    final state = ref.watch(blitzControllerProvider);
+    // ---- 核心修复思路：组件解耦与精细化监听 ----
+    // 之前全量 watch 导致滑动改变 currentIndex 和 energy 时，整颗 Widget 树甚至包含 AppinioSwiper 都被撕毁重建。
+    // 这破坏了内部极度脆弱的位移动画连续性与图层复用！
+
+    // 我们在此只精细化监听是否处于大的加载与错误状态。
+    final isLoading =
+        ref.watch(blitzControllerProvider.select((s) => s.isLoading));
+    final errorMessage =
+        ref.watch(blitzControllerProvider.select((s) => s.errorMessage));
+
+    // 注意：这里的 photos 本身是一个指针，只要不增删元素它就不会变，所以这里也阻断。
+    final photos = ref.watch(blitzControllerProvider.select((s) => s.photos));
+
     final notifier = ref.read(blitzControllerProvider.notifier);
 
-    // 路由拦截：由于 AppinioSwiper 的动画延迟，直接使用 next.hasNextPhoto 可能会有由于动画还没做完导致的状态不同步。
-    // 我们在这里监听状态，并在确实滑完了所有卡片时跳转。
+    // 路由拦截：由于 AppinioSwiper 的动画延迟，我们在这里监听状态，并在确实滑完了所有卡片时跳转。
+    // ref.listen 只是监听流而不引发 build 重建！非常安全！
     ref.listen(blitzControllerProvider, (previous, next) {
       if (!next.isLoading && next.photos.isNotEmpty && !next.hasNextPhoto) {
-        // hasNextPhoto 为 false 意味着真正到达了末尾
-        // 不必再校验 previous.hasNextPhoto（可能被连滑动画吞掉）
         _navigateToSummary(next.sessionDeletedPhotos);
       }
     });
 
     // 等待初始化或无数据状态展示
-    if (state.isLoading) {
+    if (isLoading) {
       return _buildScaffold(
           context,
           const Center(
@@ -73,14 +81,14 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                   valueColor: AlwaysStoppedAnimation(Color(0xFF8BA888)))));
     }
     // +++++++ 新增：如果有错误信息（比如权限被拒），把它显示在屏幕上 +++++++
-    if (state.errorMessage != null) {
+    if (errorMessage != null) {
       return _buildScaffold(
         context,
         Center(
           child: Padding(
             padding: const EdgeInsets.all(20.0),
             child: Text(
-              state.errorMessage!,
+              errorMessage,
               textAlign: TextAlign.center,
               style: const TextStyle(color: Colors.redAccent, fontSize: 16),
             ),
@@ -88,7 +96,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
         ),
       );
     }
-    if (state.photos.isEmpty) {
+    if (photos.isEmpty) {
       return _buildScaffold(context, _buildEmptyState());
     }
 
@@ -96,18 +104,24 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
       context,
       Column(
         children: [
-          // 顶部状态栏: 进度展示与剩余精力（防止索引越界显示）
-          _buildTopBar(
-              context,
-              state.currentIndex < state.photos.length
-                  ? state.currentIndex
-                  : state.photos.length - 1,
-              state.photos.length,
-              state.currentEnergy),
+          // 顶部状态栏: 进度展示与剩余精力（这部分交由内部拆分的独立 Consumer 订阅）
+          Consumer(builder: (context, ref, child) {
+            final currentIndex = ref
+                .watch(blitzControllerProvider.select((s) => s.currentIndex));
+            final currentEnergy = ref
+                .watch(blitzControllerProvider.select((s) => s.currentEnergy));
 
-          // 中间滑动主区
+            return _buildTopBar(
+              context,
+              currentIndex < photos.length ? currentIndex : photos.length - 1,
+              photos.length,
+              currentEnergy,
+            );
+          }),
+
+          // 中间滑动主区 (只要 photos 指针不变，这块最沉重的骨肉绝对不重建！)
           Expanded(
-            child: _buildSwiperContainer(state, notifier),
+            child: _buildSwiperContainer(photos, notifier),
           ),
 
           // 底部操作按钮群
@@ -294,7 +308,8 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
   }
 
   /// 剥离构建滑动核心区域
-  Widget _buildSwiperContainer(BlitzState state, BlitzController notifier) {
+  Widget _buildSwiperContainer(
+      List<AssetEntity> photos, BlitzController notifier) {
     return Center(
       // 关键修复：加入 AspectRatio 防止被 Expanded 拉扯变形
       // 强制 0.8 比例，恢复竖版拍立得真实的稍微“胖宽”感
@@ -305,29 +320,33 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
           padding: const EdgeInsets.only(left: 30, right: 30, bottom: 110),
           child: AppinioSwiper(
             controller: _swiperController,
-            cardCount: state.photos.length,
+            cardCount: photos.length,
             // 【关键重设】增强底部卡片层次错落感
             backgroundCardCount: 2, // 渲染底部露出来的两张卡片（不含顶层，合计看到 3 层厚度）
             backgroundCardScale: 0.92, // 底下卡片的缩放比例，差异越大越有梯度感
             backgroundCardOffset: const Offset(0, 15), // 强制让底下的图层向下偏移，模仿相册厚度
             onSwipeEnd:
                 (int previousIndex, int targetIndex, SwiperActivity activity) {
-              if (previousIndex < 0 || previousIndex >= state.photos.length) {
+              if (previousIndex < 0 || previousIndex >= photos.length) {
                 return;
               }
-              _handleSwipeEnd(activity, notifier, state.photos[previousIndex]);
+              _handleSwipeEnd(activity, notifier, photos[previousIndex]);
             },
             onEnd: () {
-              _navigateToSummary(state.sessionDeletedPhotos);
+              // 从最新的全局 state 中获取删除名单并进行跳转，规范使用 ref.read 获取
+              final currentState = ref.read(blitzControllerProvider);
+              _navigateToSummary(currentState.sessionDeletedPhotos);
             },
             cardBuilder: (BuildContext context, int index) {
-              if (index < 0 || index >= state.photos.length) {
+              if (index < 0 || index >= photos.length) {
                 return const SizedBox.shrink();
               }
-              final photo = state.photos[index];
+              final photo = photos[index];
               final shouldLoad = notifier.shouldCacheImage(index);
 
               return PhotoCard(
+                key: ValueKey(photo
+                    .id), // 注入 Key 保护底层 State，防止因数组移动导致 ImageFileFuture 被重新触发而闪烁
                 photo: photo,
                 shouldLoadImage: shouldLoad,
                 swiperController: _swiperController,
