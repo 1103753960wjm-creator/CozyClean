@@ -29,7 +29,7 @@ class DashboardPage extends ConsumerWidget {
                       _buildHeader(ref),
                       const Spacer(flex: 2),
                       _buildDataRing(ref),
-                      const SizedBox(height: 20),
+                      const Spacer(flex: 1),
                       _buildAchievementBanner(ref),
                       const Spacer(flex: 1),
                       _buildModeSelector(context),
@@ -401,66 +401,69 @@ class DashboardPage extends ConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [
-              Color(0xFFE8F5E9), // 浅绿起始
-              Color(0xFFC8E6C9), // 深绿结尾
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [
+                Color(0xFFE8F5E9), // 浅绿起始
+                Color(0xFFC8E6C9), // 深绿结尾
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20), // 增加圆角，更像胶囊
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF8BA888).withOpacity(0.15),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
             ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF8BA888).withOpacity(0.15),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            // 左侧 Emoji 图标
-            const Text('🎉', style: TextStyle(fontSize: 28)),
-            const SizedBox(width: 14),
-            // 右侧文案
-            Expanded(
-              child: totalBytes > 0
-                  ? RichText(
-                      text: TextSpan(
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF4A4238),
-                          height: 1.4,
-                        ),
-                        children: [
-                          const TextSpan(text: '累计为手机释放了 '),
-                          TextSpan(
-                            text: FormatUtils.formatBytes(totalBytes),
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF6B453E), // 绛棕色加粗数字
-                            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min, // 收缩包裹内容
+            children: [
+              // 左侧 Emoji 图标
+              const Text('🎉', style: TextStyle(fontSize: 22)),
+              const SizedBox(width: 8),
+              // 右侧文案
+              Flexible(
+                child: totalBytes > 0
+                    ? RichText(
+                        text: TextSpan(
+                          style: const TextStyle(
+                            fontSize: 12, // 缩小字号
+                            color: Color(0xFF4A4238),
+                            height: 1.4,
                           ),
-                          const TextSpan(text: ' 空间'),
-                        ],
+                          children: [
+                            const TextSpan(text: '累计为手机释放了 '),
+                            TextSpan(
+                              text: FormatUtils.formatBytes(totalBytes),
+                              style: const TextStyle(
+                                fontSize: 16, // 数字稍大
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF6B453E), // 绛棕色加粗数字
+                              ),
+                            ),
+                            const TextSpan(text: ' 空间'),
+                          ],
+                        ),
+                      )
+                    : const Text(
+                        '开始整理，成就从这里起步 ✨',
+                        style: TextStyle(
+                          fontSize: 12, // 缩小字号
+                          color: Color(0xFF6B453E),
+                          fontStyle: FontStyle.italic,
+                          letterSpacing: 0.5,
+                        ),
                       ),
-                    )
-                  : const Text(
-                      '开始整理，成就从这里起步 ✨',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF6B453E),
-                        fontStyle: FontStyle.italic,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
