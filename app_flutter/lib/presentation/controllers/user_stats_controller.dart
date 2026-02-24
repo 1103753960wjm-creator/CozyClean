@@ -142,4 +142,61 @@ class UserStatsController {
       print('❌ [UserStatsController] togglePro error: $e\n$stack');
     }
   }
+
+  /// 记录一次清理会话并累加用户统计数据
+  ///
+  /// 在 Drift 事务中执行两步操作，保证原子性：
+  ///   1. INSERT → SessionLogs 表（新增一条清理记录）
+  ///   2. UPDATE → LocalUserStats 表（累加 totalSavedBytes）
+  ///
+  /// 约束 #3：totalSavedBytes 的 += 采用"先查旧值再覆盖"模式，
+  /// 避免 Drift CustomExpression 语法问题导致的 SQL 报错。
+  ///
+  /// [mode] 清理模式（0=闪电战, 1=截图粉碎, 2=时光机）
+  /// [deletedCount] 本次实际删除的照片数
+  /// [savedBytes] 本次预估节省的空间（字节）
+  Future<void> recordCleaningSession({
+    required int mode,
+    required int deletedCount,
+    required int savedBytes,
+  }) async {
+    print('📊 [UserStatsController] recordCleaningSession: '
+        'mode=$mode, deleted=$deletedCount, saved=$savedBytes bytes');
+
+    try {
+      await _db.transaction(() async {
+        // ---- Step 1: 插入会话日志 ----
+        final sessionId = 'session_${DateTime.now().millisecondsSinceEpoch}';
+        await _db.into(_db.sessionLogs).insert(
+              SessionLogsCompanion.insert(
+                sessionId: sessionId,
+                mode: mode,
+                deletedCount: Value(deletedCount),
+                savedBytes: Value(savedBytes),
+                startTime: DateTime.now(),
+                // isSynced 默认为 false，等待后台同步
+              ),
+            );
+
+        // ---- Step 2: 累加用户统计（先查旧值再覆盖） ----
+        // 为什么不用 CustomExpression('total_saved_bytes + $savedBytes')：
+        //   Drift 对 CustomExpression 的支持在不同版本间有差异，
+        //   "先查后写"虽多一次 IO，但语义清晰、跨版本稳定。
+        final query = _db.select(_db.localUserStats)
+          ..where((t) => t.uid.equals(_defaultUserId));
+        final stat = await query.getSingleOrNull();
+
+        if (stat != null) {
+          final newTotal = stat.totalSavedBytes + savedBytes;
+          await _db.update(_db.localUserStats).replace(
+                stat.copyWith(totalSavedBytes: newTotal),
+              );
+        }
+      });
+
+      print('✅ [UserStatsController] Session recorded & stats updated.');
+    } catch (e, stack) {
+      print('❌ [UserStatsController] recordCleaningSession error: $e\n$stack');
+    }
+  }
 }

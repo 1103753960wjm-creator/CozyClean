@@ -1,15 +1,17 @@
 import 'dart:typed_data';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:confetti/confetti.dart';
 import 'package:photo_manager/photo_manager.dart';
+import '../controllers/user_stats_controller.dart';
 
 /// 总结算动画页面 (Summary Page)
 ///
 /// 两种结算流：
 /// 1. 正常删除流：信封归档打包动画 → 系统级批量删除 → 撒花结算
 /// 2. 全员珍藏流 (All-Kept)：跳过信封和删除 → 直接撒花 + 温暖结算 UI
-class SummaryPage extends StatefulWidget {
+class SummaryPage extends ConsumerStatefulWidget {
   final List<AssetEntity> deleteSet;
 
   /// 本次会话中用户审阅的照片总数（用于全员珍藏流展示）
@@ -22,10 +24,10 @@ class SummaryPage extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<SummaryPage> createState() => _SummaryPageState();
+  ConsumerState<SummaryPage> createState() => _SummaryPageState();
 }
 
-class _SummaryPageState extends State<SummaryPage>
+class _SummaryPageState extends ConsumerState<SummaryPage>
     with TickerProviderStateMixin {
   // --- 动效控制器 ---
   late AnimationController _envelopeAnimCtrl;
@@ -215,6 +217,16 @@ class _SummaryPageState extends State<SummaryPage>
         _actualDeletedCount = deletedList.length;
         _deleteFinished = true;
         _confettiController.play(); // 播撒欢乐纸屑
+
+        // ---- 数据结算：写入 Drift 数据库 ----
+        // 使用页面常量 _savingsPerPhotoMb 计算节省空间，杜绝魔法数字
+        final savedBytes =
+            (_actualDeletedCount * _savingsPerPhotoMb * 1024 * 1024).toInt();
+        ref.read(userStatsControllerProvider).recordCleaningSession(
+              mode: 0, // 闪电战 = 0
+              deletedCount: _actualDeletedCount,
+              savedBytes: savedBytes,
+            );
       } else {
         // 用户拒绝了弹窗授权或系统内部失败
         _errorMessage = '操作被取消或没删除成功 (deletedList 为空)';

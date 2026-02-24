@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'blitz_page.dart';
 import '../controllers/user_stats_controller.dart';
+import '../../core/utils/format_utils.dart';
 
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
@@ -26,11 +27,13 @@ class DashboardPage extends ConsumerWidget {
                     children: [
                       const Spacer(flex: 2),
                       _buildHeader(ref),
-                      const Spacer(flex: 3),
+                      const Spacer(flex: 2),
                       _buildDataRing(ref),
-                      const Spacer(flex: 3),
+                      const SizedBox(height: 20),
+                      _buildAchievementBanner(ref),
+                      const Spacer(flex: 1),
                       _buildModeSelector(context),
-                      const Spacer(flex: 3),
+                      const Spacer(flex: 2),
                       _buildStartButton(context),
                       const Spacer(flex: 2),
                       _buildEnergyBar(),
@@ -382,6 +385,82 @@ class DashboardPage extends ConsumerWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  /// 成就看板模块 — 展示累计清理空间
+  ///
+  /// 设计原则：
+  ///   - 有数据时：显示 “累计为手机释放了 x.x GB 空间”，给用户成就感
+  ///   - 零值/加载中：显示引导文案，鼓励用户开始整理
+  Widget _buildAchievementBanner(WidgetRef ref) {
+    final userStatsAsync = ref.watch(userStatsStreamProvider);
+    final totalBytes = userStatsAsync.value?.totalSavedBytes ?? 0;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [
+              Color(0xFFE8F5E9), // 浅绿起始
+              Color(0xFFC8E6C9), // 深绿结尾
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF8BA888).withOpacity(0.15),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // 左侧 Emoji 图标
+            const Text('🎉', style: TextStyle(fontSize: 28)),
+            const SizedBox(width: 14),
+            // 右侧文案
+            Expanded(
+              child: totalBytes > 0
+                  ? RichText(
+                      text: TextSpan(
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF4A4238),
+                          height: 1.4,
+                        ),
+                        children: [
+                          const TextSpan(text: '累计为手机释放了 '),
+                          TextSpan(
+                            text: FormatUtils.formatBytes(totalBytes),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF6B453E), // 绛棕色加粗数字
+                            ),
+                          ),
+                          const TextSpan(text: ' 空间'),
+                        ],
+                      ),
+                    )
+                  : const Text(
+                      '开始整理，成就从这里起步 ✨',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF6B453E),
+                        fontStyle: FontStyle.italic,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+            ),
+          ],
         ),
       ),
     );
