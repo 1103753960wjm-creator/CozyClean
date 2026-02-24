@@ -4,6 +4,7 @@
 /// 通过 copyWith 模式实现 Riverpod 状态更新，保持状态不可变性。
 library;
 
+import 'dart:typed_data';
 import 'package:photo_manager/photo_manager.dart';
 
 /// 闪电战 (Blitz Mode) 的引擎状态
@@ -38,6 +39,10 @@ class BlitzState {
   /// 本次会话中已标记为删除的照片列表，用于结算页归档动效与统一处决
   final List<AssetEntity> sessionDeletedPhotos;
 
+  /// 预加载好的缩略图字节流缓存 (photo.id -> Uint8List)
+  /// 在 loadPhotos 阶段一次性填充，之后 PhotoCard 同步读取，彻底消灭 FutureBuilder 闪烁
+  final Map<String, Uint8List> thumbnailCache;
+
   /// 已左滑删除的照片计数 (通过列表长度获取)
   int get deletedCount => sessionDeletedPhotos.length;
 
@@ -48,6 +53,7 @@ class BlitzState {
     this.isLoading = false,
     this.errorMessage,
     this.sessionDeletedPhotos = const [],
+    this.thumbnailCache = const {},
   });
 
   /// 便捷 getter：是否还有下一张照片可处理
@@ -70,6 +76,7 @@ class BlitzState {
     bool? isLoading,
     String? Function()? errorMessage,
     List<AssetEntity>? sessionDeletedPhotos,
+    Map<String, Uint8List>? thumbnailCache,
   }) {
     return BlitzState(
       photos: photos ?? this.photos,
@@ -79,6 +86,7 @@ class BlitzState {
       // 使用 Function 包装 nullable 字段，区分"不更新"和"设为 null"
       errorMessage: errorMessage != null ? errorMessage() : this.errorMessage,
       sessionDeletedPhotos: sessionDeletedPhotos ?? this.sessionDeletedPhotos,
+      thumbnailCache: thumbnailCache ?? this.thumbnailCache,
     );
   }
 

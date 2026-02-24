@@ -7,11 +7,13 @@
 ///   3. 提供滑动窗口缓存策略函数
 library;
 
+import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
 
 import 'package:cozy_clean/data/local/app_database.dart';
 import 'package:cozy_clean/presentation/controllers/blitz_state.dart';
+import 'package:cozy_clean/presentation/controllers/user_stats_controller.dart';
 
 // ============================================
 // Riverpod Provider 定义
@@ -141,13 +143,44 @@ class BlitzController extends Notifier<BlitzState> {
           .toList();
       print('[BlitzController] 可显示 ${availablePhotos.length} 张照片');
 
-      // ---- 5. 更新状态 ----
+      // ---- 5. 批量预加载所有缩略图到内存缓存 ----
+      // 这是消灭闪烁的终极方案！在此阶段一次性读取全部缩略图的 Uint8List，
+      // 之后 PhotoCard 直接同步渲染，不再使用任何 FutureBuilder！
+      // 50 张 800x800 缩略图约 5-10MB，完全在安全范围内。
+      print('[BlitzController] Step 5: 预加载全部缩略图...');
+      final Map<String, Uint8List> cache = {};
+      await Future.wait(
+        availablePhotos.map((photo) async {
+          final data = await photo.thumbnailDataWithSize(
+            const ThumbnailSize(800, 800),
+          );
+          if (data != null) {
+            cache[photo.id] = data;
+          }
+        }),
+      );
+      print('[BlitzController] ✅ 已预载 ${cache.length} 张缩略图到内存');
+
+      // ---- 5.5 读取真实体力值与会员状态 ----
+      final query = _db.select(_db.localUserStats)
+        ..where((t) => t.uid.equals('default_user'));
+      final userStat = await query.getSingleOrNull();
+
+      // Pro 会员 → 无限体力 (double.infinity)
+      // 普通用户 → 读取数据库中的真实剩余体力
+      final bool isPro = userStat?.isPro ?? false;
+      final double initialEnergy =
+          isPro ? double.infinity : (userStat?.dailyEnergyRemaining ?? 50.0);
+
+      // ---- 6. 更新状态 ----
       state = state.copyWith(
         photos: availablePhotos,
         currentIndex: 0,
+        currentEnergy: initialEnergy,
         isLoading: false,
         errorMessage: () => null,
         sessionDeletedPhotos: const [], // 初始化时清空本轮的暂存记录
+        thumbnailCache: cache,
       );
       print('[BlitzController] ✅ 加载完成!');
     } catch (e, stackTrace) {
@@ -177,9 +210,9 @@ class BlitzController extends Notifier<BlitzState> {
   /// 左滑操作 — 标记删除照片
   ///
   /// 业务规则：
-  ///   1. 体力不足 1 点时，阻止操作
+  ///   1. 体力不足 1 点时，阻止操作（Pro 会员跳过此检查）
   ///   2. 将操作写入 Drift 数据库，标记 actionType = 1 (Delete)
-  ///   3. 扣除 1 点体力，推进到下一张
+  ///   3. 扣除 1 点体力，推进到下一张（Pro 会员不扣除）
   Future<void> swipeLeft(AssetEntity photo) async {
     if (!state.hasEnergy) {
       state = state.copyWith(
@@ -188,11 +221,14 @@ class BlitzController extends Notifier<BlitzState> {
       return;
     }
 
+    // Pro 会员体力为 infinity，不需要扣减
+    final bool isPro = state.currentEnergy == double.infinity;
+
     try {
-      // 1. 同步进行乐观状态更新：体力 -1，索引 +1，记录并暂存删除照片。
+      // 1. 同步进行乐观状态更新：体力 -1，索引 +1，记录并暂存删除照片
       // 极其重要：务必在 awaits _db 操作之前更新 state，否则快速连滑会导致旧 state 被缓存从而丢失滑动进度。
       state = state.copyWith(
-        currentEnergy: state.currentEnergy - 1.0,
+        currentEnergy: isPro ? state.currentEnergy : state.currentEnergy - 1.0,
         currentIndex: state.currentIndex + 1,
         sessionDeletedPhotos: [
           ...state.sessionDeletedPhotos,
@@ -208,6 +244,9 @@ class BlitzController extends Notifier<BlitzState> {
               actionType: 1, // Delete
             ),
           );
+
+      // 3. 消费体力（Pro 会员在 consumeEnergy 内部会跳过）
+      await ref.read(userStatsControllerProvider).consumeEnergy(1.0);
     } catch (e) {
       print('数据库写入报错：$e');
     }
@@ -216,6 +255,7 @@ class BlitzController extends Notifier<BlitzState> {
   /// 右滑操作 — 标记保留照片
   ///
   /// 业务规则与 swipeLeft 对称，actionType = 0 (Keep)
+  /// Pro 会员不扣除体力
   Future<void> swipeRight(AssetEntity photo) async {
     if (!state.hasEnergy) {
       state = state.copyWith(
@@ -224,10 +264,13 @@ class BlitzController extends Notifier<BlitzState> {
       return;
     }
 
+    // Pro 会员体力为 infinity，不需要扣减
+    final bool isPro = state.currentEnergy == double.infinity;
+
     try {
       // 1. 同步进行乐观状态更新
       state = state.copyWith(
-        currentEnergy: state.currentEnergy - 1.0,
+        currentEnergy: isPro ? state.currentEnergy : state.currentEnergy - 1.0,
         currentIndex: state.currentIndex + 1,
         errorMessage: () => null,
       );
@@ -239,6 +282,9 @@ class BlitzController extends Notifier<BlitzState> {
               actionType: 0, // Keep
             ),
           );
+
+      // 3. 消费体力（Pro 会员在 consumeEnergy 内部会跳过）
+      await ref.read(userStatsControllerProvider).consumeEnergy(1.0);
     } catch (e) {
       print('数据库写入报错：$e');
     }

@@ -5,11 +5,21 @@ import 'package:confetti/confetti.dart';
 import 'package:photo_manager/photo_manager.dart';
 
 /// 总结算动画页面 (Summary Page)
-/// 包含：极具仪式感的信封归档打包动画 + 系统级底层一键批量删除 + Confetti 结算
+///
+/// 两种结算流：
+/// 1. 正常删除流：信封归档打包动画 → 系统级批量删除 → 撒花结算
+/// 2. 全员珍藏流 (All-Kept)：跳过信封和删除 → 直接撒花 + 温暖结算 UI
 class SummaryPage extends StatefulWidget {
   final List<AssetEntity> deleteSet;
 
-  const SummaryPage({Key? key, required this.deleteSet}) : super(key: key);
+  /// 本次会话中用户审阅的照片总数（用于全员珍藏流展示）
+  final int totalReviewedCount;
+
+  const SummaryPage({
+    Key? key,
+    required this.deleteSet,
+    this.totalReviewedCount = 0,
+  }) : super(key: key);
 
   @override
   State<SummaryPage> createState() => _SummaryPageState();
@@ -36,6 +46,9 @@ class _SummaryPageState extends State<SummaryPage>
   int _actualDeletedCount = 0;
   String? _errorMessage;
 
+  /// 全员珍藏流标识：当 deleteSet 为空时激活
+  bool _isAllKeptFlow = false;
+
   // 假设常量：每张照片预计节省空间
   static const double _savingsPerPhotoMb = 3.0;
 
@@ -48,9 +61,27 @@ class _SummaryPageState extends State<SummaryPage>
     // 强制初始化所有的动画，防止在空数据下层 build 报错 LateInitializationError
     _initAnimations();
 
-    // 如果压根没有待删项目，直接跳过动画包进入最终结算状态
+    // ======================================
+    // 全员珍藏流 (All-Kept Flow)
+    // ======================================
+    // 当用户保留了全部照片（deleteSet 为空），跳过信封动画和系统删除弹窗，
+    // 直接进入温暖的"全员珍藏"结算页面并播放撒花。
+    //
+    // TODO: 全员珍藏路由分发
+    // 情况 A：一张没删，但有上滑高光操作 (highlightSet.isNotEmpty)
+    //   → 直接跳转至 [手账海报生成器]
+    //   → 海报底部水印变为："重温了 N 张旧时光，留下了最闪耀的这一刻。"
+    //
+    // 情况 B：一张没删，也没上滑 (highlightSet.isEmpty) — 当前实现
+    //   → 进入全员珍藏结果页
+    // ======================================
     if (widget.deleteSet.isEmpty) {
+      _isAllKeptFlow = true;
       _deleteFinished = true;
+      // 首帧渲染后直接播放撒花，跳过信封动画
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _confettiController.play();
+      });
       return;
     }
 
@@ -464,8 +495,18 @@ class _SummaryPageState extends State<SummaryPage>
     });
   }
 
-  /// 构建最终展现结果（胜利结算 / 失败提示）
+  /// 构建最终展现结果
+  ///
+  /// 三种状态：
+  /// 1. 全员珍藏流 (_isAllKeptFlow) → 温暖的 🌸 结算页
+  /// 2. 正常删除成功 (isSuccess)     → ✨ 清理完成结算页
+  /// 3. 删除取消/失败 (!isSuccess)   → 😅 中止提示页
   Widget _buildResultContent() {
+    // 全员珍藏流：专属温暖 UI
+    if (_isAllKeptFlow) {
+      return _buildAllKeptResult();
+    }
+
     final bool isSuccess = _actualDeletedCount > 0 && _errorMessage == null;
 
     return SafeArea(
@@ -570,6 +611,153 @@ class _SummaryPageState extends State<SummaryPage>
                 isSuccess ? '太棒了！返回首页' : '明白了，返回首页',
                 style:
                     const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 全员珍藏专属结算页 (All-Kept Flow)
+  ///
+  /// 用户保留了所有照片时展示的温暖结算 UI：
+  /// - 🌸 Emoji + "全员珍藏" 大标题
+  /// - 照片总数统计卡片
+  /// - 撒花效果（由 initState 中触发）
+  /// - 不播放信封动画，不弹出系统删除确认框
+  Widget _buildAllKeptResult() {
+    final int reviewedCount = widget.totalReviewedCount;
+
+    return SafeArea(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Spacer(flex: 2),
+
+          // 🌸 大 Emoji
+          const Text(
+            '🌸',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 72),
+          ),
+          const SizedBox(height: 16),
+
+          // 大标题
+          const Text(
+            '全员珍藏',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF4A6B48),
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // 副标题 — 手写体风格
+          const Text(
+            '所有照片都是宝贵的回忆呢',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 15,
+              fontStyle: FontStyle.italic,
+              color: Color(0xFF8BA888),
+              letterSpacing: 1.5,
+            ),
+          ),
+
+          const SizedBox(height: 48),
+
+          // 统计卡片
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Container(
+              padding: const EdgeInsets.all(30),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFD4AF37).withOpacity(0.15),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  // 巨大数字
+                  TweenAnimationBuilder<double>(
+                    tween:
+                        Tween<double>(begin: 0, end: reviewedCount.toDouble()),
+                    duration: const Duration(seconds: 2),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, value, child) {
+                      return Text(
+                        '${value.toInt()}',
+                        style: const TextStyle(
+                          fontSize: 56,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFFD4AF37), // 金色数字
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    '个美好瞬间已悉数珍藏',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontStyle: FontStyle.italic,
+                      color: Color(0xFF6B453E),
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const Spacer(flex: 2),
+
+          // 底部提示语
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 40),
+            child: Text(
+              '今天没有需要告别的废片，全都是宝贵的记忆呢。',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.black38,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+
+          const Spacer(flex: 1),
+
+          // 底部胶囊按钮
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF8BA888),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                elevation: 4,
+                shadowColor: const Color(0xFF8BA888).withOpacity(0.4),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+              ),
+              child: const Text(
+                '回到首页',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
           ),

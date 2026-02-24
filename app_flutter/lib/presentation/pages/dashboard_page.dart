@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'blitz_page.dart';
+import '../controllers/user_stats_controller.dart';
 
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
@@ -24,9 +25,9 @@ class DashboardPage extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const Spacer(flex: 2),
-                      _buildHeader(),
+                      _buildHeader(ref),
                       const Spacer(flex: 3),
-                      _buildDataRing(),
+                      _buildDataRing(ref),
                       const Spacer(flex: 3),
                       _buildModeSelector(context),
                       const Spacer(flex: 3),
@@ -46,16 +47,31 @@ class DashboardPage extends ConsumerWidget {
   }
 
   /// 顶层欢迎与标题
-  Widget _buildHeader() {
+  Widget _buildHeader(WidgetRef ref) {
+    final userStatsAsync = ref.watch(userStatsStreamProvider);
+    final isPro = userStatsAsync.value?.isPro ?? false;
+
     return Column(
       children: [
-        const Text(
-          '晚上好，林小舒',
-          style: TextStyle(
-            fontSize: 21,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF4A4238), // 深咖啡文字色
-            letterSpacing: 1.5,
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            print(
+                '👉 [DashboardPage] Title tapped! Toggling Pro mode to: ${!isPro}');
+            ref.read(userStatsControllerProvider).togglePro(!isPro);
+          },
+          child: Padding(
+            padding:
+                const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+            child: Text(
+              '晚上好，林小舒${isPro ? ' (PRO)' : ''}',
+              style: const TextStyle(
+                fontSize: 21,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF4A4238), // 深咖啡文字色
+                letterSpacing: 1.5,
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 6),
@@ -71,41 +87,117 @@ class DashboardPage extends ConsumerWidget {
     );
   }
 
-  /// 核心数据环 - 这里未来会接入 Riverpod 里的 LocalUserStats 真实统计数
-  Widget _buildDataRing() {
+  /// 核心数据环 - 接入 LocalUserStats 真实统计数
+  ///
+  /// 会员模式区分：
+  /// - 普通用户：显示数字体力值 + 绿色/红色动态进度环
+  /// - Pro 会员：显示 ∞ 无限符号 + 金色满圈环
+  Widget _buildDataRing(WidgetRef ref) {
+    // 监听数据库中的用户数据流
+    final userStatsAsync = ref.watch(userStatsStreamProvider);
+
     return Center(
-      child: Container(
+      child: SizedBox(
         width: 144,
         height: 144,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: const Color(0xFFE5DFD3), // 浅米圈边
-            width: 3,
-            style: BorderStyle.solid,
-            // 如果引入了 dotted_border 库可以做成虚线。由于限制我们用纯原生的实线做清爽代替。
+        child: userStatsAsync.when(
+          data: (stats) {
+            final bool isPro = stats.isPro;
+            final energy = stats.dailyEnergyRemaining;
+
+            // Pro 会员：满圈金色 | 普通用户：按比例计算
+            final double progress =
+                isPro ? 1.0 : (energy / 100.0).clamp(0.0, 1.0);
+
+            // Pro 会员：金色 | 普通 <10 体力：红色 | 普通 ≥10 体力：绿色
+            final Color progressColor = isPro
+                ? const Color(0xFFD4AF37) // 金色，体现尊贵会员感
+                : energy < 10
+                    ? const Color(0xFFD66B63) // 红色警示
+                    : const Color(0xFF8BA888); // 绿色正常
+
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                // 底部浅色灰色圆环 (底座轨道)
+                const CircularProgressIndicator(
+                  value: 1.0,
+                  strokeWidth: 4,
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE5DFD3)),
+                ),
+                // 动态进度圆环，通过水平翻转使其顺时针增长
+                Transform.flip(
+                  flipX: true,
+                  child: TweenAnimationBuilder<double>(
+                      tween: Tween<double>(begin: 0, end: progress),
+                      duration: const Duration(milliseconds: 800),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, _) {
+                        return CircularProgressIndicator(
+                          value: value,
+                          strokeWidth: 4,
+                          backgroundColor: Colors.transparent,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(progressColor),
+                        );
+                      }),
+                ),
+                // 中心文字：Pro 显示 ∞，普通显示数字
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      isPro ? '∞' : '${energy.toInt()}',
+                      style: TextStyle(
+                        fontSize: isPro ? 48 : 38,
+                        fontWeight: FontWeight.w900,
+                        color: isPro
+                            ? const Color(0xFFD4AF37) // 金色数字
+                            : const Color(0xFF6B453E), // 绛棕色数字
+                      ),
+                    ),
+                    // Pro 会员隐藏 "/ 100" 副标题
+                    if (!isPro)
+                      Text(
+                        '/ 100',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF6B453E).withOpacity(0.5),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            );
+          },
+          loading: () => Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: const Color(0xFFE5DFD3),
+                width: 3,
+              ),
+            ),
+            child: const Center(
+              child: CircularProgressIndicator(color: Color(0xFFC75D56)),
+            ),
           ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              '0',
-              style: TextStyle(
-                fontSize: 38,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF6B453E), // 绛棕色
+          error: (err, stack) => Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: const Color(0xFFE5DFD3),
+                width: 3,
               ),
             ),
-            Text(
-              '/ 100',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF6B453E).withOpacity(0.5),
+            child: Center(
+              child: Text(
+                'err',
+                style: TextStyle(color: Colors.red.withOpacity(0.5)),
               ),
             ),
-          ],
+          ),
         ),
       ),
     );

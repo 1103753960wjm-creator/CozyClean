@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,9 +26,16 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
   void _navigateToSummary(List<AssetEntity> deleteSet) {
     if (_isNavigating) return;
     _isNavigating = true;
+
+    // 读取本次会话审阅的照片总数，用于全员珍藏流展示
+    final totalReviewed = ref.read(blitzControllerProvider).photos.length;
+
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (context) => SummaryPage(deleteSet: deleteSet),
+        builder: (context) => SummaryPage(
+          deleteSet: deleteSet,
+          totalReviewedCount: totalReviewed,
+        ),
       ),
     );
   }
@@ -61,6 +69,10 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
 
     // 注意：这里的 photos 本身是一个指针，只要不增删元素它就不会变，所以这里也阻断。
     final photos = ref.watch(blitzControllerProvider.select((s) => s.photos));
+
+    // 预加载好的缩略图缓存，同样只在加载时更新一次
+    final thumbnailCache =
+        ref.watch(blitzControllerProvider.select((s) => s.thumbnailCache));
 
     final notifier = ref.read(blitzControllerProvider.notifier);
 
@@ -119,9 +131,9 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
             );
           }),
 
-          // 中间滑动主区 (只要 photos 指针不变，这块最沉重的骨肉绝对不重建！)
+          // 中间滑动主区 (只要 photos 和 thumbnailCache 指针不变，这块绝对不重建！)
           Expanded(
-            child: _buildSwiperContainer(photos, notifier),
+            child: _buildSwiperContainer(photos, thumbnailCache, notifier),
           ),
 
           // 底部操作按钮群
@@ -150,7 +162,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
           // 左侧返回按钮
           GestureDetector(
             onTap: () => Navigator.maybePop(context),
-            child: const Text('← 返回',
+            child: const Text('返回',
                 style: TextStyle(
                     color: Colors.black45,
                     fontSize: 16,
@@ -308,23 +320,21 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
   }
 
   /// 剥离构建滑动核心区域
-  Widget _buildSwiperContainer(
-      List<AssetEntity> photos, BlitzController notifier) {
+  Widget _buildSwiperContainer(List<AssetEntity> photos,
+      Map<String, Uint8List> thumbnailCache, BlitzController notifier) {
     return Center(
       // 关键修复：加入 AspectRatio 防止被 Expanded 拉扯变形
       // 强制 0.8 比例，恢复竖版拍立得真实的稍微“胖宽”感
       child: AspectRatio(
         aspectRatio: 0.80,
         child: Padding(
-          // 极大地拉升下部屏障距离（bottom: 110），强行顶起缩小卡片避免任何元素盖住
           padding: const EdgeInsets.only(left: 30, right: 30, bottom: 110),
           child: AppinioSwiper(
             controller: _swiperController,
             cardCount: photos.length,
-            // 【关键重设】增强底部卡片层次错落感
-            backgroundCardCount: 2, // 渲染底部露出来的两张卡片（不含顶层，合计看到 3 层厚度）
-            backgroundCardScale: 0.92, // 底下卡片的缩放比例，差异越大越有梯度感
-            backgroundCardOffset: const Offset(0, 15), // 强制让底下的图层向下偏移，模仿相册厚度
+            backgroundCardCount: 2,
+            backgroundCardScale: 0.92,
+            backgroundCardOffset: const Offset(0, 15),
             onSwipeEnd:
                 (int previousIndex, int targetIndex, SwiperActivity activity) {
               if (previousIndex < 0 || previousIndex >= photos.length) {
@@ -333,7 +343,6 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
               _handleSwipeEnd(activity, notifier, photos[previousIndex]);
             },
             onEnd: () {
-              // 从最新的全局 state 中获取删除名单并进行跳转，规范使用 ref.read 获取
               final currentState = ref.read(blitzControllerProvider);
               _navigateToSummary(currentState.sessionDeletedPhotos);
             },
@@ -342,13 +351,10 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                 return const SizedBox.shrink();
               }
               final photo = photos[index];
-              final shouldLoad = notifier.shouldCacheImage(index);
 
               return PhotoCard(
-                key: ValueKey(photo
-                    .id), // 注入 Key 保护底层 State，防止因数组移动导致 ImageFileFuture 被重新触发而闪烁
-                photo: photo,
-                shouldLoadImage: shouldLoad,
+                key: ValueKey(photo.id),
+                imageData: thumbnailCache[photo.id], // 纯同步传入，零闪烁
                 swiperController: _swiperController,
                 index: index,
               );
