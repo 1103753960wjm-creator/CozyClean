@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:confetti/confetti.dart';
 import 'package:photo_manager/photo_manager.dart';
+import '../controllers/blitz_controller.dart';
 import '../controllers/user_stats_controller.dart';
 
 /// 总结算动画页面 (Summary Page)
@@ -222,11 +223,13 @@ class _SummaryPageState extends ConsumerState<SummaryPage>
         // 使用页面常量 _savingsPerPhotoMb 计算节省空间，杜绝魔法数字
         final savedBytes =
             (_actualDeletedCount * _savingsPerPhotoMb * 1024 * 1024).toInt();
-        ref.read(userStatsControllerProvider).recordCleaningSession(
-              mode: 0, // 闪电战 = 0
-              deletedCount: _actualDeletedCount,
-              savedBytes: savedBytes,
-            );
+
+        final currentState = ref.read(blitzControllerProvider);
+        ref.read(userStatsControllerProvider).commitBlitzSession(
+            keeps: currentState.sessionKeeps,
+            deletes: currentState.sessionDeletes,
+            savedBytes: savedBytes);
+        ref.read(blitzControllerProvider.notifier).clearSessionDraft();
       } else {
         // 用户拒绝了弹窗授权或系统内部失败
         _errorMessage = '操作被取消或没删除成功 (deletedList 为空)';

@@ -199,4 +199,92 @@ class UserStatsController {
       print('❌ [UserStatsController] recordCleaningSession error: $e\n$stack');
     }
   }
+
+  /// 批量提交闪电战内存草稿到数据库（一次性事务）
+  ///
+  /// 这是"内存草稿模式"的核心落库方法。
+  /// 接收 BlitzController 中暂存的 keeps/deletes Set，在单次 Drift batch 中
+  /// 批量写入 PhotoActions，同时更新 SessionLogs 和 totalSavedBytes。
+  ///
+  /// 约束 #2：使用 Drift 原生 batch API，避免 for 循环单条 insert 的性能问题。
+  ///
+  /// [keeps] 右滑保留的 photo ID 集合
+  /// [deletes] 左滑删除的 photo ID 集合
+  /// [savedBytes] 预估本次释放的空间（字节）
+  Future<void> commitBlitzSession({
+    required Set<String> keeps,
+    required Set<String> deletes,
+    required int savedBytes,
+  }) async {
+    final totalActions = keeps.length + deletes.length;
+    print('📊 [UserStatsController] commitBlitzSession: '
+        'keeps=${keeps.length}, deletes=${deletes.length}, '
+        'saved=$savedBytes bytes, total=$totalActions actions');
+
+    if (totalActions == 0) {
+      print('⚠️ [UserStatsController] 空草稿，跳过提交');
+      return;
+    }
+
+    try {
+      // ---- Step 1: 批量插入 PhotoActions (Drift batch API) ----
+      // 构造 keeps 和 deletes 的 Companion 列表
+      final keepsEntities = keeps
+          .map((id) => PhotoActionsCompanion.insert(id: id, actionType: 0))
+          .toList();
+      final deletesEntities = deletes
+          .map((id) => PhotoActionsCompanion.insert(id: id, actionType: 1))
+          .toList();
+
+      await _db.batch((batch) {
+        if (keepsEntities.isNotEmpty) {
+          batch.insertAllOnConflictUpdate(_db.photoActions, keepsEntities);
+        }
+        if (deletesEntities.isNotEmpty) {
+          batch.insertAllOnConflictUpdate(_db.photoActions, deletesEntities);
+        }
+      });
+
+      // ---- Step 2: 插入 SessionLog + 累加 totalSavedBytes (事务) ----
+      await _db.transaction(() async {
+        final sessionId = 'session_${DateTime.now().millisecondsSinceEpoch}';
+        await _db.into(_db.sessionLogs).insert(
+              SessionLogsCompanion.insert(
+                sessionId: sessionId,
+                mode: 0, // 闪电战
+                deletedCount: Value(deletes.length),
+                savedBytes: Value(savedBytes),
+                startTime: DateTime.now(),
+              ),
+            );
+
+        // 先查旧值再覆盖（安全的 += 模式）
+        final query = _db.select(_db.localUserStats)
+          ..where((t) => t.uid.equals(_defaultUserId));
+        final stat = await query.getSingleOrNull();
+
+        if (stat != null) {
+          final newTotal = stat.totalSavedBytes + savedBytes;
+          await _db.update(_db.localUserStats).replace(
+                stat.copyWith(totalSavedBytes: newTotal),
+              );
+        }
+      });
+
+      print('✅ [UserStatsController] Batch commit 完成: '
+          '$totalActions 条 PhotoActions 已写入');
+    } catch (e, stack) {
+      print('❌ [UserStatsController] commitBlitzSession error: $e\n$stack');
+    }
+  }
+
+  /// 一键升级为终身 Pro 会员
+  ///
+  /// 语义化封装，内部调用 togglePro(true)。
+  /// 使用场景：
+  ///   - 支付成功回调
+  ///   - 调试/测试时快速切换
+  Future<void> upgradeToPro() async {
+    await togglePro(true);
+  }
 }

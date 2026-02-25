@@ -4,47 +4,66 @@ import 'blitz_page.dart';
 import '../controllers/user_stats_controller.dart';
 import '../../core/utils/format_utils.dart';
 
-class DashboardPage extends ConsumerWidget {
+import 'profile_page.dart';
+
+class DashboardPage extends ConsumerStatefulWidget {
   const DashboardPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends ConsumerState<DashboardPage> {
+  int _currentIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
     // 基础骨架，手账风暖白底色
     return Scaffold(
       backgroundColor: const Color(0xFFFAF9F6),
       bottomNavigationBar: _buildBottomNav(),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: ConstrainedBox(
-                // 确保最小高度充满全屏，超出时允许滚动
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: IntrinsicHeight(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Spacer(flex: 2),
-                      _buildHeader(ref),
-                      const Spacer(flex: 2),
-                      _buildDataRing(ref),
-                      const Spacer(flex: 1),
-                      _buildAchievementBanner(ref),
-                      const Spacer(flex: 1),
-                      _buildModeSelector(context),
-                      const Spacer(flex: 2),
-                      _buildStartButton(context),
-                      const Spacer(flex: 2),
-                      _buildEnergyBar(),
-                      const Spacer(flex: 2),
-                    ],
-                  ),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: [
+          _buildDashboardContent(),
+          const ProfilePage(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDashboardContent() {
+    return SafeArea(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: ConstrainedBox(
+              // 确保最小高度充满全屏，超出时允许滚动
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: IntrinsicHeight(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Spacer(flex: 2),
+                    _buildHeader(ref),
+                    const Spacer(flex: 2),
+                    _buildDataRing(ref),
+                    const Spacer(flex: 1),
+                    _buildAchievementBanner(ref),
+                    const Spacer(flex: 1),
+                    _buildModeSelector(context),
+                    const Spacer(flex: 2),
+                    _buildStartButton(context),
+                    const Spacer(flex: 2),
+                    _buildEnergyBar(),
+                    const Spacer(flex: 2),
+                  ],
                 ),
               ),
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -510,6 +529,12 @@ class DashboardPage extends ConsumerWidget {
         ],
       ),
       child: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
         elevation: 0,
         backgroundColor: Colors.transparent,
         selectedItemColor: const Color(0xFFC75D56), // 主题红
@@ -526,6 +551,7 @@ class DashboardPage extends ConsumerWidget {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
             label: '我的',
           ),
         ],

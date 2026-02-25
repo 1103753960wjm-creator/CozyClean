@@ -43,6 +43,14 @@ class BlitzState {
   /// 在 loadPhotos 阶段一次性填充，之后 PhotoCard 同步读取，彻底消灭 FutureBuilder 闪烁
   final Map<String, Uint8List> thumbnailCache;
 
+  /// 内存草稿：本轮右滑（保留）的照片 Asset ID 集合
+  /// 仅在结算时通过 commitBlitzSession 批量写入数据库
+  final Set<String> sessionKeeps;
+
+  /// 内存草稿：本轮左滑（删除）的照片 Asset ID 集合
+  /// 仅在结算时通过 commitBlitzSession 批量写入数据库
+  final Set<String> sessionDeletes;
+
   /// 已左滑删除的照片计数 (通过列表长度获取)
   int get deletedCount => sessionDeletedPhotos.length;
 
@@ -54,6 +62,8 @@ class BlitzState {
     this.errorMessage,
     this.sessionDeletedPhotos = const [],
     this.thumbnailCache = const {},
+    this.sessionKeeps = const {},
+    this.sessionDeletes = const {},
   });
 
   /// 便捷 getter：是否还有下一张照片可处理
@@ -77,6 +87,8 @@ class BlitzState {
     String? Function()? errorMessage,
     List<AssetEntity>? sessionDeletedPhotos,
     Map<String, Uint8List>? thumbnailCache,
+    Set<String>? sessionKeeps,
+    Set<String>? sessionDeletes,
   }) {
     return BlitzState(
       photos: photos ?? this.photos,
@@ -87,11 +99,14 @@ class BlitzState {
       errorMessage: errorMessage != null ? errorMessage() : this.errorMessage,
       sessionDeletedPhotos: sessionDeletedPhotos ?? this.sessionDeletedPhotos,
       thumbnailCache: thumbnailCache ?? this.thumbnailCache,
+      sessionKeeps: sessionKeeps ?? this.sessionKeeps,
+      sessionDeletes: sessionDeletes ?? this.sessionDeletes,
     );
   }
 
   @override
   String toString() =>
       'BlitzState(photos: ${photos.length}, index: $currentIndex, '
-      'energy: $currentEnergy, loading: $isLoading, error: $errorMessage)';
+      'energy: $currentEnergy, loading: $isLoading, '
+      'keeps: ${sessionKeeps.length}, deletes: ${sessionDeletes.length})';
 }

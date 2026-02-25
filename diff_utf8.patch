@@ -1,0 +1,767 @@
+﻿diff --git a/app_flutter/lib/presentation/controllers/blitz_controller.dart b/app_flutter/lib/presentation/controllers/blitz_controller.dart
+index 03f6b77..610ca5f 100644
+--- a/app_flutter/lib/presentation/controllers/blitz_controller.dart
++++ b/app_flutter/lib/presentation/controllers/blitz_controller.dart
+@@ -124,24 +124,39 @@ class BlitzController extends Notifier<BlitzState> {
+ 
+       // 鍙栫涓€涓浉鍐岋紙閫氬父鏄?鎵€鏈夌収鐗?/"鏈€杩戦」鐩?锛?       final recentAlbum = albums.first;
+-      print('[BlitzController] Step 3: 浠庣浉鍐?"${recentAlbum.name}" 鍔犺浇鐓х墖...');
+-      final List<AssetEntity> rawPhotos = await recentAlbum.getAssetListPaged(
+-        page: 0,
+-        size: _fetchBatchSize,
+-      );
+-      print('[BlitzController] 鍔犺浇鍒?${rawPhotos.length} 寮犲師濮嬬収鐗?);
+ 
+-      // ---- 3. 鏌ヨ宸插垹闄ょ殑鐓х墖 ID 闆嗗悎 ----
+-      print('[BlitzController] Step 4: 鏌ヨ宸插垹闄ょ収鐗?..');
+-      final deletedIds = await _getDeletedPhotoIds();
+-      print('[BlitzController] 宸插垹闄?${deletedIds.length} 寮?);
++      // ---- 3 & 4. 娓告爣缈婚〉鎶撳彇涓庡幓閲嶈繃婊?----
++      print('[BlitzController] Step 3&4: 鏅鸿兘缈婚〉鎶撳彇鏈鐞嗙収鐗?..');
++      final processedIds = await _getProcessedPhotoIds();
++      print('[BlitzController] 鏁版嵁搴撲腑宸茶褰?${processedIds.length} 寮犲凡澶勭悊鐓х墖');
++
++      List<AssetEntity> availablePhotos = [];
++      int currentPage = 0;
++
++      // 鍙杩樻病鍑戝鐩爣鏁伴噺锛屽氨涓嶆柇寰€鐩稿唽娣卞缈婚〉
++      while (availablePhotos.length < _targetPhotoCount) {
++        final batch = await recentAlbum.getAssetListPaged(
++          page: currentPage,
++          size: _fetchBatchSize,
++        );
++
++        if (batch.isEmpty) {
++          print('[BlitzController] 鐩稿唽宸茶搴曪紝鍋滄鎶撳彇');
++          break; // 娌℃湁鏇村鐓х墖浜?+        }
++
++        // 绛涢€夊嚭灏氭湭澶勭悊杩囩殑鐓х墖锛圞eep + Delete 鍧囨帓闄わ級
++        final unhandled = batch.where((p) => !processedIds.contains(p.id));
++        availablePhotos.addAll(unhandled);
++        currentPage++;
++      }
+ 
+-      // ---- 4. 杩囨护锛氫粎鎺掗櫎宸叉爣璁板垹闄ょ殑鐓х墖锛屼繚鐣欑殑鐓х墖缁х画鏄剧ず ----
+-      final availablePhotos = rawPhotos
+-          .where((photo) => !deletedIds.contains(photo.id))
+-          .take(_targetPhotoCount)
+-          .toList();
+-      print('[BlitzController] 鍙樉绀?${availablePhotos.length} 寮犵収鐗?);
++      // 闃插尽鎬ф埅鍙栵細浠呭湪瓒呭嚭鐩爣鏁伴噺鏃舵埅鍙栵紝閬垮厤 RangeError
++      if (availablePhotos.length > _targetPhotoCount) {
++        availablePhotos = availablePhotos.sublist(0, _targetPhotoCount);
++      }
++      print(
++          '[BlitzController] 鏈€缁堟崬鍙栧埌 ${availablePhotos.length} 寮犲彲灞曠ず鐓х墖 (缈讳簡 $currentPage 椤?');
+ 
+       // ---- 5. 鎵归噺棰勫姞杞芥墍鏈夌缉鐣ュ浘鍒板唴瀛樼紦瀛?----
+       // 杩欐槸娑堢伃闂儊鐨勭粓鏋佹柟妗堬紒鍦ㄦ闃舵涓€娆℃€ц鍙栧叏閮ㄧ缉鐣ュ浘鐨?Uint8List锛?@@ -181,6 +196,8 @@ class BlitzController extends Notifier<BlitzState> {
+         errorMessage: () => null,
+         sessionDeletedPhotos: const [], // 鍒濆鍖栨椂娓呯┖鏈疆鐨勬殏瀛樿褰?         thumbnailCache: cache,
++        sessionKeeps: const {}, // 娓呯┖鍐呭瓨鑽夌
++        sessionDeletes: const {}, // 娓呯┖鍐呭瓨鑽夌
+       );
+       print('[BlitzController] 鉁?鍔犺浇瀹屾垚!');
+     } catch (e, stackTrace) {
+@@ -194,122 +211,118 @@ class BlitzController extends Notifier<BlitzState> {
+     }
+   }
+ 
+-  /// 浠?Drift 鏁版嵁搴撹鍙栨墍鏈夊凡鏍囪涓?鍒犻櫎"鐨勭収鐗?Asset ID
+-  /// 鍙帓闄?actionType=1 (Delete) 鐨勭収鐗囷紝淇濈暀 actionType=0 (Keep) 鐨勭収鐗囦粛鐒跺彲鏌ョ湅
+-  Future<Set<String>> _getDeletedPhotoIds() async {
+-    final rows = await (_db.select(_db.photoActions)
+-          ..where((t) => t.actionType.equals(1)))
+-        .get();
++  /// 鏌ヨ鎵€鏈夊凡澶勭悊杩囷紙鍖呮嫭淇濈暀鍜屽垹闄わ級鐨勭収鐗?ID锛岄伩鍏嶉噸澶嶈繘鍏ユ暣鐞嗛槦鍒?+  ///
++  /// 鏍稿績淇锛氭棫浠ｇ爜鍙繃婊?Delete锛屽鑷?Keep 鐓х墖姣忔閲嶅鍑虹幇锛?鍙虫粦骞界伒"Bug锛夈€?+  /// 鐜板湪鏌ヨ鍏ㄨ〃锛孠eep + Delete 涓€寰嬫帓闄ゃ€?+  Future<Set<String>> _getProcessedPhotoIds() async {
++    final rows = await _db.select(_db.photoActions).get();
+     return rows.map((row) => row.id).toSet();
+   }
+ 
+   // ====================================================
+-  // 鏍稿績閫昏緫 2锛氫氦浜掍笌钀藉簱
++  // 鏍稿績閫昏緫 2锛氫氦浜掞紙绾唴瀛樿崏绋匡紝涓嶇鏁版嵁搴擄級
+   // ====================================================
+ 
+-  /// 宸︽粦鎿嶄綔 鈥?鏍囪鍒犻櫎鐓х墖
++  /// 宸︽粦鎿嶄綔 鈥?鏍囪鍒犻櫎鐓х墖锛堜粎鍐欏叆鍐呭瓨鑽夌锛?+  ///
++  /// 杩斿洖鍊硷細
++  ///   - `true`  鈫?鎿嶄綔鎴愬姛锛屽凡璁板綍鍒拌崏绋?+  ///   - `false` 鈫?浣撳姏涓嶈冻锛屾搷浣滆鎷︽埅锛圲I 灞傛嵁姝ゅ脊鍥炲崱鐗囷級
+   ///
+   /// 涓氬姟瑙勫垯锛?-  ///   1. 浣撳姏涓嶈冻 1 鐐规椂锛岄樆姝㈡搷浣滐紙Pro 浼氬憳璺宠繃姝ゆ鏌ワ級
+-  ///   2. 灏嗘搷浣滃啓鍏?Drift 鏁版嵁搴擄紝鏍囪 actionType = 1 (Delete)
+-  ///   3. 鎵ｉ櫎 1 鐐逛綋鍔涳紝鎺ㄨ繘鍒颁笅涓€寮狅紙Pro 浼氬憳涓嶆墸闄わ級
+-  Future<void> swipeLeft(AssetEntity photo) async {
+-    if (!state.hasEnergy) {
++  ///   1. 闈?Pro 鐢ㄦ埛涓斾綋鍔?鈮?0 鈫?杩斿洖 false锛屼笉鏇存柊浠讳綍鐘舵€?+  ///   2. 灏?photo.id 鍐欏叆 state.sessionDeletes锛堝唴瀛?Set锛?+  ///   3. 灏?AssetEntity 杩藉姞鍒?sessionDeletedPhotos锛堢粨绠楅〉鍔ㄧ敾鐢級
++  ///   4. 鎵ｉ櫎 1 鐐逛綋鍔涘苟瀹炴椂鎸佷箙鍖栧埌 DB锛堥槻姝㈠埛浣撳姏婕忔礊锛?+  Future<bool> swipeLeft(AssetEntity photo) async {
++    final bool isPro = state.currentEnergy == double.infinity;
++
++    // 浣撳姏鎷︽埅锛氶潪 Pro 涓旀棤浣撳姏 鈫?绔嬪嵆杩斿洖 false
++    if (!isPro && state.currentEnergy < 1.0) {
+       state = state.copyWith(
+         errorMessage: () => '浣撳姏涓嶈冻锛岃浼戞伅涓€涓嬫垨瑙傜湅骞垮憡鎭㈠浣撳姏',
+       );
+-      return;
++      return false;
+     }
+ 
+-    // Pro 浼氬憳浣撳姏涓?infinity锛屼笉闇€瑕佹墸鍑?-    final bool isPro = state.currentEnergy == double.infinity;
++    // 1. 鍚屾鏇存柊鍐呭瓨鑽夌 + 鐘舵€?+    // 鏋佸叾閲嶈锛氬姟蹇呭湪 await 涔嬪墠鏇存柊 state锛屽惁鍒欏揩閫熻繛婊戜細涓㈠け杩涘害
++    state = state.copyWith(
++      currentEnergy: isPro ? state.currentEnergy : state.currentEnergy - 1.0,
++      currentIndex: state.currentIndex + 1,
++      sessionDeletes: {...state.sessionDeletes, photo.id},
++      sessionDeletedPhotos: [...state.sessionDeletedPhotos, photo],
++      errorMessage: () => null,
++    );
+ 
++    // 2. 寮傛鎵ｉ櫎浣撳姏鍒?DB锛圥ro 浼氬憳鍦?consumeEnergy 鍐呴儴璺宠繃锛?     try {
+-      // 1. 鍚屾杩涜涔愯鐘舵€佹洿鏂帮細浣撳姏 -1锛岀储寮?+1锛岃褰曞苟鏆傚瓨鍒犻櫎鐓х墖
+-      // 鏋佸叾閲嶈锛氬姟蹇呭湪 awaits _db 鎿嶄綔涔嬪墠鏇存柊 state锛屽惁鍒欏揩閫熻繛婊戜細瀵艰嚧鏃?state 琚紦瀛樹粠鑰屼涪澶辨粦鍔ㄨ繘搴︺€?-      state = state.copyWith(
+-        currentEnergy: isPro ? state.currentEnergy : state.currentEnergy - 1.0,
+-        currentIndex: state.currentIndex + 1,
+-        sessionDeletedPhotos: [
+-          ...state.sessionDeletedPhotos,
+-          photo
+-        ], // 鏆傚瓨鍒版湰杞緟澶勫喅鍒楄〃
+-        errorMessage: () => null,
+-      );
+-
+-      // 2. 寮傛鍐欏叆 Drift 鏁版嵁搴擄細actionType = 1 浠ｈ〃 Delete
+-      await _db.into(_db.photoActions).insertOnConflictUpdate(
+-            PhotoActionsCompanion.insert(
+-              id: photo.id,
+-              actionType: 1, // Delete
+-            ),
+-          );
+-
+-      // 3. 娑堣垂浣撳姏锛圥ro 浼氬憳鍦?consumeEnergy 鍐呴儴浼氳烦杩囷級
+       await ref.read(userStatsControllerProvider).consumeEnergy(1.0);
+     } catch (e) {
+-      print('鏁版嵁搴撳啓鍏ユ姤閿欙細$e');
++      print('[BlitzController] 浣撳姏鎵ｉ櫎澶辫触: $e');
+     }
++
++    return true;
+   }
+ 
+-  /// 鍙虫粦鎿嶄綔 鈥?鏍囪淇濈暀鐓х墖
++  /// 鍙虫粦鎿嶄綔 鈥?鏍囪淇濈暀鐓х墖锛堜粎鍐欏叆鍐呭瓨鑽夌锛?   ///
+-  /// 涓氬姟瑙勫垯涓?swipeLeft 瀵圭О锛宎ctionType = 0 (Keep)
+-  /// Pro 浼氬憳涓嶆墸闄や綋鍔?-  Future<void> swipeRight(AssetEntity photo) async {
+-    if (!state.hasEnergy) {
++  /// 杩斿洖鍊间笌 swipeLeft 瀵圭О锛?+  ///   - `true`  鈫?鎿嶄綔鎴愬姛
++  ///   - `false` 鈫?浣撳姏涓嶈冻锛岃鎷︽埅
++  Future<bool> swipeRight(AssetEntity photo) async {
++    final bool isPro = state.currentEnergy == double.infinity;
++
++    // 浣撳姏鎷︽埅
++    if (!isPro && state.currentEnergy < 1.0) {
+       state = state.copyWith(
+         errorMessage: () => '浣撳姏涓嶈冻锛岃浼戞伅涓€涓嬫垨瑙傜湅骞垮憡鎭㈠浣撳姏',
+       );
+-      return;
++      return false;
+     }
+ 
+-    // Pro 浼氬憳浣撳姏涓?infinity锛屼笉闇€瑕佹墸鍑?-    final bool isPro = state.currentEnergy == double.infinity;
++    // 1. 鍚屾鏇存柊鍐呭瓨鑽夌 + 鐘舵€?+    state = state.copyWith(
++      currentEnergy: isPro ? state.currentEnergy : state.currentEnergy - 1.0,
++      currentIndex: state.currentIndex + 1,
++      sessionKeeps: {...state.sessionKeeps, photo.id},
++      errorMessage: () => null,
++    );
+ 
++    // 2. 寮傛鎵ｉ櫎浣撳姏鍒?DB
+     try {
+-      // 1. 鍚屾杩涜涔愯鐘舵€佹洿鏂?-      state = state.copyWith(
+-        currentEnergy: isPro ? state.currentEnergy : state.currentEnergy - 1.0,
+-        currentIndex: state.currentIndex + 1,
+-        errorMessage: () => null,
+-      );
+-
+-      // 2. 寮傛鍐欏叆 Drift 鏁版嵁搴擄細actionType = 0 浠ｈ〃 Keep
+-      await _db.into(_db.photoActions).insertOnConflictUpdate(
+-            PhotoActionsCompanion.insert(
+-              id: photo.id,
+-              actionType: 0, // Keep
+-            ),
+-          );
+-
+-      // 3. 娑堣垂浣撳姏锛圥ro 浼氬憳鍦?consumeEnergy 鍐呴儴浼氳烦杩囷級
+       await ref.read(userStatsControllerProvider).consumeEnergy(1.0);
+     } catch (e) {
+-      print('鏁版嵁搴撳啓鍏ユ姤閿欙細$e');
++      print('[BlitzController] 浣撳姏鎵ｉ櫎澶辫触: $e');
+     }
++
++    return true;
+   }
+ 
+   // ====================================================
+-  // 鏍稿績閫昏緫 3锛氭粦鍔ㄧ獥鍙ｅ唴瀛樻帶鍒?+  // 鏍稿績閫昏緫 3锛氳崏绋垮洖婊?   // ====================================================
+ 
+-  /// 鍒ゆ柇鎸囧畾绱㈠紩鐨勭収鐗囨槸鍚﹀簲璇ヨ缂撳瓨锛堝姞杞藉師鍥惧埌鍐呭瓨锛?-  ///
+-  /// 婊戝姩绐楀彛绛栫暐璇存槑锛?-  /// ```
+-  /// 鐓х墖搴忓垪:  ... [i-2] [i-1] [i] [i+1] [i+2] [i+3] ...
+-  /// 缂撳瓨绐楀彛:         鉁?   鉁?  鉁?  鉁?-  ///                  prev  curr  next next+1
+-  /// ```
++  /// 娓呯┖鏈疆鍐呭瓨鑽夌锛堢敤鎴蜂腑閫旈€€鍑烘椂璋冪敤锛?   ///
+-  /// 绐楀彛鑼冨洿 = [currentIndex - 1, currentIndex + 2]
++  /// 鐢变簬婊戝姩闃舵涓嶅啓搴擄紝璋冪敤姝ゆ柟娉曞悗鏁版嵁搴撲腑涓嶄細娈嬬暀浠讳綍
++  /// "骞界伒搴熺墖"璁板綍锛屾湰娆℃搷浣滅瓑浜庝粠鏈彂鐢熻繃銆?   ///
+-  /// 涓轰粈涔堜繚鐣欏墠 1 寮狅細
+-  ///   鐢ㄦ埛鍙兘闇€瑕?鎾ら攢"鎿嶄綔锛屽洖鐪嬩笂涓€寮犮€傜紦瀛樺墠 1 寮犲彲浠ュ疄鐜版棤寤惰繜鍥為€€銆?-  ///
+-  /// 涓轰粈涔堥鍔犺浇鍚?2 寮狅細
+-  ///   鐢ㄦ埛蹇€熸粦鍔ㄦ椂锛岃嚦灏戞湁 2 寮犵収鐗囧凡缁忓湪鍐呭瓨涓紝
++  /// 娉ㄦ剰锛氫綋鍔涘凡瀹炴椂鎵ｉ櫎鍒?DB锛岃繖鏄湁鎰忎负涔嬬殑鈥斺€?+  /// 闃叉鐢ㄦ埛鍙嶅杩涘叆閫€鍑烘潵鍒蜂綋鍔涖€?+  void clearSessionDraft() {
++    state = state.copyWith(
++      sessionKeeps: const {},
++      sessionDeletes: const {},
++      sessionDeletedPhotos: const [],
++    );
++  }
++
++  // ====================================================
++  // 鏍稿績閫昏緫 4锛氭粦鍔ㄧ獥鍙ｅ唴瀛樻帶鍒?+  // ====================================================
++
+   /// 鍒ゅ畾鏌愬紶鍗＄墖鏄惁搴斿綋瑙﹀彂瀹為檯鍔犺浇 (闃?OOM 绛栫暐)
+   ///
+   /// 瑙勫垯锛?@@ -319,7 +332,7 @@ class BlitzController extends Notifier<BlitzState> {
+     if (state.photos.isEmpty) return false;
+ 
+     final lower = state.currentIndex - 1;
+-    final upper = state.currentIndex + 3; // 娣卞害寤朵几鑷冲悗 3 寮?+    final upper = state.currentIndex + 3;
+ 
+     return index >= lower && index <= upper;
+   }
+diff --git a/app_flutter/lib/presentation/controllers/blitz_state.dart b/app_flutter/lib/presentation/controllers/blitz_state.dart
+index f933ea2..25d5dff 100644
+--- a/app_flutter/lib/presentation/controllers/blitz_state.dart
++++ b/app_flutter/lib/presentation/controllers/blitz_state.dart
+@@ -43,6 +43,14 @@ class BlitzState {
+   /// 鍦?loadPhotos 闃舵涓€娆℃€у～鍏咃紝涔嬪悗 PhotoCard 鍚屾璇诲彇锛屽交搴曟秷鐏?FutureBuilder 闂儊
+   final Map<String, Uint8List> thumbnailCache;
+ 
++  /// 鍐呭瓨鑽夌锛氭湰杞彸婊戯紙淇濈暀锛夌殑鐓х墖 Asset ID 闆嗗悎
++  /// 浠呭湪缁撶畻鏃堕€氳繃 commitBlitzSession 鎵归噺鍐欏叆鏁版嵁搴?+  final Set<String> sessionKeeps;
++
++  /// 鍐呭瓨鑽夌锛氭湰杞乏婊戯紙鍒犻櫎锛夌殑鐓х墖 Asset ID 闆嗗悎
++  /// 浠呭湪缁撶畻鏃堕€氳繃 commitBlitzSession 鎵归噺鍐欏叆鏁版嵁搴?+  final Set<String> sessionDeletes;
++
+   /// 宸插乏婊戝垹闄ょ殑鐓х墖璁℃暟 (閫氳繃鍒楄〃闀垮害鑾峰彇)
+   int get deletedCount => sessionDeletedPhotos.length;
+ 
+@@ -54,6 +62,8 @@ class BlitzState {
+     this.errorMessage,
+     this.sessionDeletedPhotos = const [],
+     this.thumbnailCache = const {},
++    this.sessionKeeps = const {},
++    this.sessionDeletes = const {},
+   });
+ 
+   /// 渚挎嵎 getter锛氭槸鍚﹁繕鏈変笅涓€寮犵収鐗囧彲澶勭悊
+@@ -77,6 +87,8 @@ class BlitzState {
+     String? Function()? errorMessage,
+     List<AssetEntity>? sessionDeletedPhotos,
+     Map<String, Uint8List>? thumbnailCache,
++    Set<String>? sessionKeeps,
++    Set<String>? sessionDeletes,
+   }) {
+     return BlitzState(
+       photos: photos ?? this.photos,
+@@ -87,11 +99,14 @@ class BlitzState {
+       errorMessage: errorMessage != null ? errorMessage() : this.errorMessage,
+       sessionDeletedPhotos: sessionDeletedPhotos ?? this.sessionDeletedPhotos,
+       thumbnailCache: thumbnailCache ?? this.thumbnailCache,
++      sessionKeeps: sessionKeeps ?? this.sessionKeeps,
++      sessionDeletes: sessionDeletes ?? this.sessionDeletes,
+     );
+   }
+ 
+   @override
+   String toString() =>
+       'BlitzState(photos: ${photos.length}, index: $currentIndex, '
+-      'energy: $currentEnergy, loading: $isLoading, error: $errorMessage)';
++      'energy: $currentEnergy, loading: $isLoading, '
++      'keeps: ${sessionKeeps.length}, deletes: ${sessionDeletes.length})';
+ }
+diff --git a/app_flutter/lib/presentation/controllers/user_stats_controller.dart b/app_flutter/lib/presentation/controllers/user_stats_controller.dart
+index 300f49f..87d8d52 100644
+--- a/app_flutter/lib/presentation/controllers/user_stats_controller.dart
++++ b/app_flutter/lib/presentation/controllers/user_stats_controller.dart
+@@ -199,4 +199,92 @@ class UserStatsController {
+       print('鉂?[UserStatsController] recordCleaningSession error: $e\n$stack');
+     }
+   }
++
++  /// 鎵归噺鎻愪氦闂數鎴樺唴瀛樿崏绋垮埌鏁版嵁搴擄紙涓€娆℃€т簨鍔★級
++  ///
++  /// 杩欐槸"鍐呭瓨鑽夌妯″紡"鐨勬牳蹇冭惤搴撴柟娉曘€?+  /// 鎺ユ敹 BlitzController 涓殏瀛樼殑 keeps/deletes Set锛屽湪鍗曟 Drift batch 涓?+  /// 鎵归噺鍐欏叆 PhotoActions锛屽悓鏃舵洿鏂?SessionLogs 鍜?totalSavedBytes銆?+  ///
++  /// 绾︽潫 #2锛氫娇鐢?Drift 鍘熺敓 batch API锛岄伩鍏?for 寰幆鍗曟潯 insert 鐨勬€ц兘闂銆?+  ///
++  /// [keeps] 鍙虫粦淇濈暀鐨?photo ID 闆嗗悎
++  /// [deletes] 宸︽粦鍒犻櫎鐨?photo ID 闆嗗悎
++  /// [savedBytes] 棰勪及鏈閲婃斁鐨勭┖闂达紙瀛楄妭锛?+  Future<void> commitBlitzSession({
++    required Set<String> keeps,
++    required Set<String> deletes,
++    required int savedBytes,
++  }) async {
++    final totalActions = keeps.length + deletes.length;
++    print('馃搳 [UserStatsController] commitBlitzSession: '
++        'keeps=${keeps.length}, deletes=${deletes.length}, '
++        'saved=$savedBytes bytes, total=$totalActions actions');
++
++    if (totalActions == 0) {
++      print('鈿狅笍 [UserStatsController] 绌鸿崏绋匡紝璺宠繃鎻愪氦');
++      return;
++    }
++
++    try {
++      // ---- Step 1: 鎵归噺鎻掑叆 PhotoActions (Drift batch API) ----
++      // 鏋勯€?keeps 鍜?deletes 鐨?Companion 鍒楄〃
++      final keepsEntities = keeps
++          .map((id) => PhotoActionsCompanion.insert(id: id, actionType: 0))
++          .toList();
++      final deletesEntities = deletes
++          .map((id) => PhotoActionsCompanion.insert(id: id, actionType: 1))
++          .toList();
++
++      await _db.batch((batch) {
++        if (keepsEntities.isNotEmpty) {
++          batch.insertAllOnConflictUpdate(_db.photoActions, keepsEntities);
++        }
++        if (deletesEntities.isNotEmpty) {
++          batch.insertAllOnConflictUpdate(_db.photoActions, deletesEntities);
++        }
++      });
++
++      // ---- Step 2: 鎻掑叆 SessionLog + 绱姞 totalSavedBytes (浜嬪姟) ----
++      await _db.transaction(() async {
++        final sessionId = 'session_${DateTime.now().millisecondsSinceEpoch}';
++        await _db.into(_db.sessionLogs).insert(
++              SessionLogsCompanion.insert(
++                sessionId: sessionId,
++                mode: 0, // 闂數鎴?+                deletedCount: Value(deletes.length),
++                savedBytes: Value(savedBytes),
++                startTime: DateTime.now(),
++              ),
++            );
++
++        // 鍏堟煡鏃у€煎啀瑕嗙洊锛堝畨鍏ㄧ殑 += 妯″紡锛?+        final query = _db.select(_db.localUserStats)
++          ..where((t) => t.uid.equals(_defaultUserId));
++        final stat = await query.getSingleOrNull();
++
++        if (stat != null) {
++          final newTotal = stat.totalSavedBytes + savedBytes;
++          await _db.update(_db.localUserStats).replace(
++                stat.copyWith(totalSavedBytes: newTotal),
++              );
++        }
++      });
++
++      print('鉁?[UserStatsController] Batch commit 瀹屾垚: '
++          '$totalActions 鏉?PhotoActions 宸插啓鍏?);
++    } catch (e, stack) {
++      print('鉂?[UserStatsController] commitBlitzSession error: $e\n$stack');
++    }
++  }
++
++  /// 涓€閿崌绾т负缁堣韩 Pro 浼氬憳
++  ///
++  /// 璇箟鍖栧皝瑁咃紝鍐呴儴璋冪敤 togglePro(true)銆?+  /// 浣跨敤鍦烘櫙锛?+  ///   - 鏀粯鎴愬姛鍥炶皟
++  ///   - 璋冭瘯/娴嬭瘯鏃跺揩閫熷垏鎹?+  Future<void> upgradeToPro() async {
++    await togglePro(true);
++  }
+ }
+diff --git a/app_flutter/lib/presentation/pages/blitz_page.dart b/app_flutter/lib/presentation/pages/blitz_page.dart
+index 02da7ac..61cb891 100644
+--- a/app_flutter/lib/presentation/pages/blitz_page.dart
++++ b/app_flutter/lib/presentation/pages/blitz_page.dart
+@@ -143,11 +143,120 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
+     );
+   }
+ 
++  void _showExitConfirmationBottomSheet() {
++    final sessionDeletes = ref.read(blitzControllerProvider).sessionDeletes;
++    final deletedPhotos =
++        ref.read(blitzControllerProvider).sessionDeletedPhotos;
++
++    showModalBottomSheet(
++      context: context,
++      backgroundColor: Colors.transparent,
++      builder: (BuildContext ctx) {
++        return Container(
++          padding: const EdgeInsets.all(24),
++          decoration: const BoxDecoration(
++            color: Color(0xFFFAF9F6),
++            borderRadius: BorderRadius.only(
++              topLeft: Radius.circular(24),
++              topRight: Radius.circular(24),
++            ),
++          ),
++          child: Column(
++            mainAxisSize: MainAxisSize.min,
++            children: [
++              const Text(
++                '绛夌瓑锛?,
++                style: TextStyle(
++                  fontSize: 22,
++                  fontWeight: FontWeight.bold,
++                  color: Color(0xFF4A4238),
++                ),
++              ),
++              const SizedBox(height: 12),
++              Text(
++                '浣犳湁 ${sessionDeletes.length} 寮犲簾鐗囧緟娓呯悊锛岃鐜板湪褰掓。鍚楋紵',
++                style: const TextStyle(
++                  fontSize: 16,
++                  color: Colors.black54,
++                ),
++                textAlign: TextAlign.center,
++              ),
++              const SizedBox(height: 24),
++              Row(
++                children: [
++                  Expanded(
++                    child: OutlinedButton(
++                      style: OutlinedButton.styleFrom(
++                        padding: const EdgeInsets.symmetric(vertical: 16),
++                        side: const BorderSide(color: Color(0xFFC75D56)),
++                        shape: RoundedRectangleBorder(
++                          borderRadius: BorderRadius.circular(16),
++                        ),
++                      ),
++                      onPressed: () {
++                        ref
++                            .read(blitzControllerProvider.notifier)
++                            .clearSessionDraft();
++                        Navigator.of(ctx).pop();
++                        Navigator.of(context).pop();
++                      },
++                      child: const Text(
++                        '鎵嬫粦鏀惧純',
++                        style: TextStyle(
++                          color: Color(0xFFC75D56),
++                          fontSize: 16,
++                          fontWeight: FontWeight.bold,
++                        ),
++                      ),
++                    ),
++                  ),
++                  const SizedBox(width: 16),
++                  Expanded(
++                    child: ElevatedButton(
++                      style: ElevatedButton.styleFrom(
++                        padding: const EdgeInsets.symmetric(vertical: 16),
++                        backgroundColor: const Color(0xFF8BA888),
++                        elevation: 0,
++                        shape: RoundedRectangleBorder(
++                          borderRadius: BorderRadius.circular(16),
++                        ),
++                      ),
++                      onPressed: () {
++                        Navigator.of(ctx).pop();
++                        _navigateToSummary(deletedPhotos);
++                      },
++                      child: const Text(
++                        '杩欏氨鍘绘竻',
++                        style: TextStyle(
++                          color: Colors.white,
++                          fontSize: 16,
++                          fontWeight: FontWeight.bold,
++                        ),
++                      ),
++                    ),
++                  ),
++                ],
++              ),
++              const SizedBox(height: 20),
++            ],
++          ),
++        );
++      },
++    );
++  }
++
+   /// 鏋勫缓搴曞眰鑴氭墜鏋讹紝娉ㄥ叆濂剁櫧/绫抽粍鑹茶儗鏅?   Widget _buildScaffold(BuildContext context, Widget child) {
+-    return Scaffold(
+-      backgroundColor: const Color(0xFFFAF9F6), // "娓╂殩鎵嬭处椋? 绾稿紶鐧藉簳
+-      body: SafeArea(child: child),
++    return PopScope(
++      canPop: ref.watch(blitzControllerProvider).sessionDeletes.isEmpty,
++      onPopInvoked: (didPop) {
++        if (didPop) return;
++        _showExitConfirmationBottomSheet();
++      },
++      child: Scaffold(
++        backgroundColor: const Color(0xFFFAF9F6), // "娓╂殩鎵嬭处椋? 绾稿紶鐧藉簳
++        body: SafeArea(child: child),
++      ),
+     );
+   }
+ 
+@@ -161,7 +270,15 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
+         children: [
+           // 宸︿晶杩斿洖鎸夐挳
+           GestureDetector(
+-            onTap: () => Navigator.maybePop(context),
++            onTap: () async {
++              final sessionDeletes =
++                  ref.read(blitzControllerProvider).sessionDeletes;
++              if (sessionDeletes.isEmpty) {
++                Navigator.maybePop(context);
++              } else {
++                _showExitConfirmationBottomSheet();
++              }
++            },
+             child: const Text('杩斿洖',
+                 style: TextStyle(
+                     color: Colors.black45,
+@@ -303,18 +420,91 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
+     );
+   }
+ 
++  void _showNoEnergyWarning() {
++    showModalBottomSheet(
++      context: context,
++      backgroundColor: Colors.transparent,
++      builder: (BuildContext ctx) {
++        return Container(
++          padding: const EdgeInsets.all(24),
++          decoration: const BoxDecoration(
++            color: Color(0xFFFAF9F6),
++            borderRadius: BorderRadius.only(
++              topLeft: Radius.circular(24),
++              topRight: Radius.circular(24),
++            ),
++          ),
++          child: Column(
++            mainAxisSize: MainAxisSize.min,
++            children: [
++              const Text(
++                '浣撳姏鑰楀敖',
++                style: TextStyle(
++                  fontSize: 22,
++                  fontWeight: FontWeight.bold,
++                  color: Color(0xFFC75D56),
++                ),
++              ),
++              const SizedBox(height: 12),
++              const Text(
++                '浠婃棩浣撳姏宸茶€楀敖锛岃В閿?PRO 鑾峰彇鏃犻檺浣撳姏',
++                style: TextStyle(
++                  fontSize: 16,
++                  color: Colors.black54,
++                ),
++                textAlign: TextAlign.center,
++              ),
++              const SizedBox(height: 24),
++              ElevatedButton(
++                style: ElevatedButton.styleFrom(
++                  padding: const EdgeInsets.symmetric(vertical: 16),
++                  minimumSize: const Size(double.infinity, 50),
++                  backgroundColor: const Color(0xFFD4AF37), // 閲戣壊
++                  elevation: 0,
++                  shape: RoundedRectangleBorder(
++                    borderRadius: BorderRadius.circular(16),
++                  ),
++                ),
++                onPressed: () {
++                  Navigator.of(ctx).pop();
++                },
++                child: const Text(
++                  '浜嗚В PRO 鏉冪泭',
++                  style: TextStyle(
++                    color: Colors.white,
++                    fontSize: 16,
++                    fontWeight: FontWeight.bold,
++                  ),
++                ),
++              ),
++              const SizedBox(height: 20),
++            ],
++          ),
++        );
++      },
++    );
++  }
++
+   /// 灏佽 Swiper 鍗＄墖婊戝姩鍚庣殑閫氱敤鍥炶皟浜嬩欢鍒嗘瀽
+   void _handleSwipeEnd(
+-      SwiperActivity activity, dynamic notifier, dynamic photo) {
++      SwiperActivity activity, dynamic notifier, dynamic photo) async {
+     if (activity is Swipe) {
+       if (activity.direction == AxisDirection.left) {
+         // 宸︽粦 (鍒犻櫎 - 杈冮噸鍔涘弽棣?
+         HapticFeedback.mediumImpact();
+-        notifier.swipeLeft(photo);
++        final success = await notifier.swipeLeft(photo);
++        if (!success) {
++          _swiperController.unswipe();
++          _showNoEnergyWarning();
++        }
+       } else if (activity.direction == AxisDirection.right) {
+         // 鍙虫粦 (淇濈暀 - 杞婚噺鍙嶉)
+         HapticFeedback.lightImpact();
+-        notifier.swipeRight(photo);
++        final success = await notifier.swipeRight(photo);
++        if (!success) {
++          _swiperController.unswipe();
++          _showNoEnergyWarning();
++        }
+       }
+     }
+   }
+diff --git a/app_flutter/lib/presentation/pages/dashboard_page.dart b/app_flutter/lib/presentation/pages/dashboard_page.dart
+index 06fcbba..299a858 100644
+--- a/app_flutter/lib/presentation/pages/dashboard_page.dart
++++ b/app_flutter/lib/presentation/pages/dashboard_page.dart
+@@ -4,47 +4,66 @@ import 'blitz_page.dart';
+ import '../controllers/user_stats_controller.dart';
+ import '../../core/utils/format_utils.dart';
+ 
+-class DashboardPage extends ConsumerWidget {
++import 'profile_page.dart';
++
++class DashboardPage extends ConsumerStatefulWidget {
+   const DashboardPage({super.key});
+ 
+   @override
+-  Widget build(BuildContext context, WidgetRef ref) {
++  ConsumerState<DashboardPage> createState() => _DashboardPageState();
++}
++
++class _DashboardPageState extends ConsumerState<DashboardPage> {
++  int _currentIndex = 0;
++
++  @override
++  Widget build(BuildContext context) {
+     // 鍩虹楠ㄦ灦锛屾墜璐﹂鏆栫櫧搴曡壊
+     return Scaffold(
+       backgroundColor: const Color(0xFFFAF9F6),
+       bottomNavigationBar: _buildBottomNav(),
+-      body: SafeArea(
+-        child: LayoutBuilder(
+-          builder: (context, constraints) {
+-            return SingleChildScrollView(
+-              physics: const BouncingScrollPhysics(),
+-              child: ConstrainedBox(
+-                // 纭繚鏈€灏忛珮搴﹀厖婊″叏灞忥紝瓒呭嚭鏃跺厑璁告粴鍔?-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+-                child: IntrinsicHeight(
+-                  child: Column(
+-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+-                    children: [
+-                      const Spacer(flex: 2),
+-                      _buildHeader(ref),
+-                      const Spacer(flex: 2),
+-                      _buildDataRing(ref),
+-                      const Spacer(flex: 1),
+-                      _buildAchievementBanner(ref),
+-                      const Spacer(flex: 1),
+-                      _buildModeSelector(context),
+-                      const Spacer(flex: 2),
+-                      _buildStartButton(context),
+-                      const Spacer(flex: 2),
+-                      _buildEnergyBar(),
+-                      const Spacer(flex: 2),
+-                    ],
+-                  ),
++      body: IndexedStack(
++        index: _currentIndex,
++        children: [
++          _buildDashboardContent(),
++          const ProfilePage(),
++        ],
++      ),
++    );
++  }
++
++  Widget _buildDashboardContent() {
++    return SafeArea(
++      child: LayoutBuilder(
++        builder: (context, constraints) {
++          return SingleChildScrollView(
++            physics: const BouncingScrollPhysics(),
++            child: ConstrainedBox(
++              // 纭繚鏈€灏忛珮搴﹀厖婊″叏灞忥紝瓒呭嚭鏃跺厑璁告粴鍔?+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
++              child: IntrinsicHeight(
++                child: Column(
++                  crossAxisAlignment: CrossAxisAlignment.stretch,
++                  children: [
++                    const Spacer(flex: 2),
++                    _buildHeader(ref),
++                    const Spacer(flex: 2),
++                    _buildDataRing(ref),
++                    const Spacer(flex: 1),
++                    _buildAchievementBanner(ref),
++                    const Spacer(flex: 1),
++                    _buildModeSelector(context),
++                    const Spacer(flex: 2),
++                    _buildStartButton(context),
++                    const Spacer(flex: 2),
++                    _buildEnergyBar(),
++                    const Spacer(flex: 2),
++                  ],
+                 ),
+               ),
+-            );
+-          },
+-        ),
++            ),
++          );
++        },
+       ),
+     );
+   }
+@@ -510,6 +529,12 @@ class DashboardPage extends ConsumerWidget {
+         ],
+       ),
+       child: BottomNavigationBar(
++        currentIndex: _currentIndex,
++        onTap: (index) {
++          setState(() {
++            _currentIndex = index;
++          });
++        },
+         elevation: 0,
+         backgroundColor: Colors.transparent,
+         selectedItemColor: const Color(0xFFC75D56), // 涓婚绾?@@ -526,6 +551,7 @@ class DashboardPage extends ConsumerWidget {
+           ),
+           BottomNavigationBarItem(
+             icon: Icon(Icons.person_outline),
++            activeIcon: Icon(Icons.person),
+             label: '鎴戠殑',
+           ),
+         ],
+diff --git a/app_flutter/lib/presentation/pages/summary_page.dart b/app_flutter/lib/presentation/pages/summary_page.dart
+index a9ed996..67c683e 100644
+--- a/app_flutter/lib/presentation/pages/summary_page.dart
++++ b/app_flutter/lib/presentation/pages/summary_page.dart
+@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
+ import 'package:flutter_riverpod/flutter_riverpod.dart';
+ import 'package:confetti/confetti.dart';
+ import 'package:photo_manager/photo_manager.dart';
++import '../controllers/blitz_controller.dart';
+ import '../controllers/user_stats_controller.dart';
+ 
+ /// 鎬荤粨绠楀姩鐢婚〉闈?(Summary Page)
+@@ -222,11 +223,13 @@ class _SummaryPageState extends ConsumerState<SummaryPage>
+         // 浣跨敤椤甸潰甯搁噺 _savingsPerPhotoMb 璁＄畻鑺傜渷绌洪棿锛屾潨缁濋瓟娉曟暟瀛?         final savedBytes =
+             (_actualDeletedCount * _savingsPerPhotoMb * 1024 * 1024).toInt();
+-        ref.read(userStatsControllerProvider).recordCleaningSession(
+-              mode: 0, // 闂數鎴?= 0
+-              deletedCount: _actualDeletedCount,
+-              savedBytes: savedBytes,
+-            );
++
++        final currentState = ref.read(blitzControllerProvider);
++        ref.read(userStatsControllerProvider).commitBlitzSession(
++            keeps: currentState.sessionKeeps,
++            deletes: currentState.sessionDeletes,
++            savedBytes: savedBytes);
++        ref.read(blitzControllerProvider.notifier).clearSessionDraft();
+       } else {
+         // 鐢ㄦ埛鎷掔粷浜嗗脊绐楁巿鏉冩垨绯荤粺鍐呴儴澶辫触
+         _errorMessage = '鎿嶄綔琚彇娑堟垨娌″垹闄ゆ垚鍔?(deletedList 涓虹┖)';

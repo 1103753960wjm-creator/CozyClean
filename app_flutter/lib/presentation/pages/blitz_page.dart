@@ -143,11 +143,120 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
     );
   }
 
+  void _showExitConfirmationBottomSheet() {
+    final sessionDeletes = ref.read(blitzControllerProvider).sessionDeletes;
+    final deletedPhotos =
+        ref.read(blitzControllerProvider).sessionDeletedPhotos;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext ctx) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: const BoxDecoration(
+            color: Color(0xFFFAF9F6),
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                '等等！',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF4A4238),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '你有 ${sessionDeletes.length} 张废片待清理，要现在归档吗？',
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Colors.black54,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: const BorderSide(color: Color(0xFFC75D56)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      onPressed: () {
+                        ref
+                            .read(blitzControllerProvider.notifier)
+                            .clearSessionDraft();
+                        Navigator.of(ctx).pop();
+                        Navigator.of(context).pop();
+                      },
+                      child: const Text(
+                        '手滑放弃',
+                        style: TextStyle(
+                          color: Color(0xFFC75D56),
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        backgroundColor: const Color(0xFF8BA888),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        _navigateToSummary(deletedPhotos);
+                      },
+                      child: const Text(
+                        '这就去清',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   /// 构建底层脚手架，注入奶白/米黄色背景
   Widget _buildScaffold(BuildContext context, Widget child) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFAF9F6), // "温暖手账风" 纸张白底
-      body: SafeArea(child: child),
+    return PopScope(
+      canPop: ref.watch(blitzControllerProvider).sessionDeletes.isEmpty,
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        _showExitConfirmationBottomSheet();
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFFAF9F6), // "温暖手账风" 纸张白底
+        body: SafeArea(child: child),
+      ),
     );
   }
 
@@ -161,7 +270,15 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
         children: [
           // 左侧返回按钮
           GestureDetector(
-            onTap: () => Navigator.maybePop(context),
+            onTap: () async {
+              final sessionDeletes =
+                  ref.read(blitzControllerProvider).sessionDeletes;
+              if (sessionDeletes.isEmpty) {
+                Navigator.maybePop(context);
+              } else {
+                _showExitConfirmationBottomSheet();
+              }
+            },
             child: const Text('返回',
                 style: TextStyle(
                     color: Colors.black45,
@@ -303,18 +420,91 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
     );
   }
 
+  void _showNoEnergyWarning() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext ctx) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: const BoxDecoration(
+            color: Color(0xFFFAF9F6),
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                '体力耗尽',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFC75D56),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                '今日体力已耗尽，解锁 PRO 获取无限体力',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.black54,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  minimumSize: const Size(double.infinity, 50),
+                  backgroundColor: const Color(0xFFD4AF37), // 金色
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                },
+                child: const Text(
+                  '了解 PRO 权益',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   /// 封装 Swiper 卡片滑动后的通用回调事件分析
   void _handleSwipeEnd(
-      SwiperActivity activity, dynamic notifier, dynamic photo) {
+      SwiperActivity activity, dynamic notifier, dynamic photo) async {
     if (activity is Swipe) {
       if (activity.direction == AxisDirection.left) {
         // 左滑 (删除 - 较重力反馈)
         HapticFeedback.mediumImpact();
-        notifier.swipeLeft(photo);
+        final success = await notifier.swipeLeft(photo);
+        if (!success) {
+          _swiperController.unswipe();
+          _showNoEnergyWarning();
+        }
       } else if (activity.direction == AxisDirection.right) {
         // 右滑 (保留 - 轻量反馈)
         HapticFeedback.lightImpact();
-        notifier.swipeRight(photo);
+        final success = await notifier.swipeRight(photo);
+        if (!success) {
+          _swiperController.unswipe();
+          _showNoEnergyWarning();
+        }
       }
     }
   }

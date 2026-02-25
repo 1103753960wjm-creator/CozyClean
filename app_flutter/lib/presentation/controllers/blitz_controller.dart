@@ -124,24 +124,39 @@ class BlitzController extends Notifier<BlitzState> {
 
       // 取第一个相册（通常是"所有照片"/"最近项目"）
       final recentAlbum = albums.first;
-      print('[BlitzController] Step 3: 从相册 "${recentAlbum.name}" 加载照片...');
-      final List<AssetEntity> rawPhotos = await recentAlbum.getAssetListPaged(
-        page: 0,
-        size: _fetchBatchSize,
-      );
-      print('[BlitzController] 加载到 ${rawPhotos.length} 张原始照片');
 
-      // ---- 3. 查询已删除的照片 ID 集合 ----
-      print('[BlitzController] Step 4: 查询已删除照片...');
-      final deletedIds = await _getDeletedPhotoIds();
-      print('[BlitzController] 已删除 ${deletedIds.length} 张');
+      // ---- 3 & 4. 游标翻页抓取与去重过滤 ----
+      print('[BlitzController] Step 3&4: 智能翻页抓取未处理照片...');
+      final processedIds = await _getProcessedPhotoIds();
+      print('[BlitzController] 数据库中已记录 ${processedIds.length} 张已处理照片');
 
-      // ---- 4. 过滤：仅排除已标记删除的照片，保留的照片继续显示 ----
-      final availablePhotos = rawPhotos
-          .where((photo) => !deletedIds.contains(photo.id))
-          .take(_targetPhotoCount)
-          .toList();
-      print('[BlitzController] 可显示 ${availablePhotos.length} 张照片');
+      List<AssetEntity> availablePhotos = [];
+      int currentPage = 0;
+
+      // 只要还没凑够目标数量，就不断往相册深处翻页
+      while (availablePhotos.length < _targetPhotoCount) {
+        final batch = await recentAlbum.getAssetListPaged(
+          page: currentPage,
+          size: _fetchBatchSize,
+        );
+
+        if (batch.isEmpty) {
+          print('[BlitzController] 相册已见底，停止抓取');
+          break; // 没有更多照片了
+        }
+
+        // 筛选出尚未处理过的照片（Keep + Delete 均排除）
+        final unhandled = batch.where((p) => !processedIds.contains(p.id));
+        availablePhotos.addAll(unhandled);
+        currentPage++;
+      }
+
+      // 防御性截取：仅在超出目标数量时截取，避免 RangeError
+      if (availablePhotos.length > _targetPhotoCount) {
+        availablePhotos = availablePhotos.sublist(0, _targetPhotoCount);
+      }
+      print(
+          '[BlitzController] 最终捞取到 ${availablePhotos.length} 张可展示照片 (翻了 $currentPage 页)');
 
       // ---- 5. 批量预加载所有缩略图到内存缓存 ----
       // 这是消灭闪烁的终极方案！在此阶段一次性读取全部缩略图的 Uint8List，
@@ -181,6 +196,8 @@ class BlitzController extends Notifier<BlitzState> {
         errorMessage: () => null,
         sessionDeletedPhotos: const [], // 初始化时清空本轮的暂存记录
         thumbnailCache: cache,
+        sessionKeeps: const {}, // 清空内存草稿
+        sessionDeletes: const {}, // 清空内存草稿
       );
       print('[BlitzController] ✅ 加载完成!');
     } catch (e, stackTrace) {
@@ -194,122 +211,118 @@ class BlitzController extends Notifier<BlitzState> {
     }
   }
 
-  /// 从 Drift 数据库读取所有已标记为"删除"的照片 Asset ID
-  /// 只排除 actionType=1 (Delete) 的照片，保留 actionType=0 (Keep) 的照片仍然可查看
-  Future<Set<String>> _getDeletedPhotoIds() async {
-    final rows = await (_db.select(_db.photoActions)
-          ..where((t) => t.actionType.equals(1)))
-        .get();
+  /// 查询所有已处理过（包括保留和删除）的照片 ID，避免重复进入整理队列
+  ///
+  /// 核心修复：旧代码只过滤 Delete，导致 Keep 照片每次重复出现（"右滑幽灵"Bug）。
+  /// 现在查询全表，Keep + Delete 一律排除。
+  Future<Set<String>> _getProcessedPhotoIds() async {
+    final rows = await _db.select(_db.photoActions).get();
     return rows.map((row) => row.id).toSet();
   }
 
   // ====================================================
-  // 核心逻辑 2：交互与落库
+  // 核心逻辑 2：交互（纯内存草稿，不碰数据库）
   // ====================================================
 
-  /// 左滑操作 — 标记删除照片
+  /// 左滑操作 — 标记删除照片（仅写入内存草稿）
+  ///
+  /// 返回值：
+  ///   - `true`  → 操作成功，已记录到草稿
+  ///   - `false` → 体力不足，操作被拦截（UI 层据此弹回卡片）
   ///
   /// 业务规则：
-  ///   1. 体力不足 1 点时，阻止操作（Pro 会员跳过此检查）
-  ///   2. 将操作写入 Drift 数据库，标记 actionType = 1 (Delete)
-  ///   3. 扣除 1 点体力，推进到下一张（Pro 会员不扣除）
-  Future<void> swipeLeft(AssetEntity photo) async {
-    if (!state.hasEnergy) {
+  ///   1. 非 Pro 用户且体力 ≤ 0 → 返回 false，不更新任何状态
+  ///   2. 将 photo.id 写入 state.sessionDeletes（内存 Set）
+  ///   3. 将 AssetEntity 追加到 sessionDeletedPhotos（结算页动画用）
+  ///   4. 扣除 1 点体力并实时持久化到 DB（防止刷体力漏洞）
+  Future<bool> swipeLeft(AssetEntity photo) async {
+    final bool isPro = state.currentEnergy == double.infinity;
+
+    // 体力拦截：非 Pro 且无体力 → 立即返回 false
+    if (!isPro && state.currentEnergy < 1.0) {
       state = state.copyWith(
         errorMessage: () => '体力不足，请休息一下或观看广告恢复体力',
       );
-      return;
+      return false;
     }
 
-    // Pro 会员体力为 infinity，不需要扣减
-    final bool isPro = state.currentEnergy == double.infinity;
+    // 1. 同步更新内存草稿 + 状态
+    // 极其重要：务必在 await 之前更新 state，否则快速连滑会丢失进度
+    state = state.copyWith(
+      currentEnergy: isPro ? state.currentEnergy : state.currentEnergy - 1.0,
+      currentIndex: state.currentIndex + 1,
+      sessionDeletes: {...state.sessionDeletes, photo.id},
+      sessionDeletedPhotos: [...state.sessionDeletedPhotos, photo],
+      errorMessage: () => null,
+    );
 
+    // 2. 异步扣除体力到 DB（Pro 会员在 consumeEnergy 内部跳过）
     try {
-      // 1. 同步进行乐观状态更新：体力 -1，索引 +1，记录并暂存删除照片
-      // 极其重要：务必在 awaits _db 操作之前更新 state，否则快速连滑会导致旧 state 被缓存从而丢失滑动进度。
-      state = state.copyWith(
-        currentEnergy: isPro ? state.currentEnergy : state.currentEnergy - 1.0,
-        currentIndex: state.currentIndex + 1,
-        sessionDeletedPhotos: [
-          ...state.sessionDeletedPhotos,
-          photo
-        ], // 暂存到本轮待处决列表
-        errorMessage: () => null,
-      );
-
-      // 2. 异步写入 Drift 数据库：actionType = 1 代表 Delete
-      await _db.into(_db.photoActions).insertOnConflictUpdate(
-            PhotoActionsCompanion.insert(
-              id: photo.id,
-              actionType: 1, // Delete
-            ),
-          );
-
-      // 3. 消费体力（Pro 会员在 consumeEnergy 内部会跳过）
       await ref.read(userStatsControllerProvider).consumeEnergy(1.0);
     } catch (e) {
-      print('数据库写入报错：$e');
+      print('[BlitzController] 体力扣除失败: $e');
     }
+
+    return true;
   }
 
-  /// 右滑操作 — 标记保留照片
+  /// 右滑操作 — 标记保留照片（仅写入内存草稿）
   ///
-  /// 业务规则与 swipeLeft 对称，actionType = 0 (Keep)
-  /// Pro 会员不扣除体力
-  Future<void> swipeRight(AssetEntity photo) async {
-    if (!state.hasEnergy) {
+  /// 返回值与 swipeLeft 对称：
+  ///   - `true`  → 操作成功
+  ///   - `false` → 体力不足，被拦截
+  Future<bool> swipeRight(AssetEntity photo) async {
+    final bool isPro = state.currentEnergy == double.infinity;
+
+    // 体力拦截
+    if (!isPro && state.currentEnergy < 1.0) {
       state = state.copyWith(
         errorMessage: () => '体力不足，请休息一下或观看广告恢复体力',
       );
-      return;
+      return false;
     }
 
-    // Pro 会员体力为 infinity，不需要扣减
-    final bool isPro = state.currentEnergy == double.infinity;
+    // 1. 同步更新内存草稿 + 状态
+    state = state.copyWith(
+      currentEnergy: isPro ? state.currentEnergy : state.currentEnergy - 1.0,
+      currentIndex: state.currentIndex + 1,
+      sessionKeeps: {...state.sessionKeeps, photo.id},
+      errorMessage: () => null,
+    );
 
+    // 2. 异步扣除体力到 DB
     try {
-      // 1. 同步进行乐观状态更新
-      state = state.copyWith(
-        currentEnergy: isPro ? state.currentEnergy : state.currentEnergy - 1.0,
-        currentIndex: state.currentIndex + 1,
-        errorMessage: () => null,
-      );
-
-      // 2. 异步写入 Drift 数据库：actionType = 0 代表 Keep
-      await _db.into(_db.photoActions).insertOnConflictUpdate(
-            PhotoActionsCompanion.insert(
-              id: photo.id,
-              actionType: 0, // Keep
-            ),
-          );
-
-      // 3. 消费体力（Pro 会员在 consumeEnergy 内部会跳过）
       await ref.read(userStatsControllerProvider).consumeEnergy(1.0);
     } catch (e) {
-      print('数据库写入报错：$e');
+      print('[BlitzController] 体力扣除失败: $e');
     }
+
+    return true;
   }
 
   // ====================================================
-  // 核心逻辑 3：滑动窗口内存控制
+  // 核心逻辑 3：草稿回滚
   // ====================================================
 
-  /// 判断指定索引的照片是否应该被缓存（加载原图到内存）
+  /// 清空本轮内存草稿（用户中途退出时调用）
   ///
-  /// 滑动窗口策略说明：
-  /// ```
-  /// 照片序列:  ... [i-2] [i-1] [i] [i+1] [i+2] [i+3] ...
-  /// 缓存窗口:         ✅    ✅   ✅   ✅
-  ///                  prev  curr  next next+1
-  /// ```
+  /// 由于滑动阶段不写库，调用此方法后数据库中不会残留任何
+  /// "幽灵废片"记录，本次操作等于从未发生过。
   ///
-  /// 窗口范围 = [currentIndex - 1, currentIndex + 2]
-  ///
-  /// 为什么保留前 1 张：
-  ///   用户可能需要"撤销"操作，回看上一张。缓存前 1 张可以实现无延迟回退。
-  ///
-  /// 为什么预加载后 2 张：
-  ///   用户快速滑动时，至少有 2 张照片已经在内存中，
+  /// 注意：体力已实时扣除到 DB，这是有意为之的——
+  /// 防止用户反复进入退出来刷体力。
+  void clearSessionDraft() {
+    state = state.copyWith(
+      sessionKeeps: const {},
+      sessionDeletes: const {},
+      sessionDeletedPhotos: const [],
+    );
+  }
+
+  // ====================================================
+  // 核心逻辑 4：滑动窗口内存控制
+  // ====================================================
+
   /// 判定某张卡片是否应当触发实际加载 (防 OOM 策略)
   ///
   /// 规则：
@@ -319,7 +332,7 @@ class BlitzController extends Notifier<BlitzState> {
     if (state.photos.isEmpty) return false;
 
     final lower = state.currentIndex - 1;
-    final upper = state.currentIndex + 3; // 深度延伸至后 3 张
+    final upper = state.currentIndex + 3;
 
     return index >= lower && index <= upper;
   }
