@@ -253,6 +253,8 @@ class BlitzController extends Notifier<BlitzState> {
       currentIndex: state.currentIndex + 1,
       sessionDeletes: {...state.sessionDeletes, photo.id},
       sessionDeletedPhotos: [...state.sessionDeletedPhotos, photo],
+      lastSwipedPhoto: () => photo,
+      lastSwipeWasDelete: () => true,
       errorMessage: () => null,
     );
 
@@ -287,6 +289,8 @@ class BlitzController extends Notifier<BlitzState> {
       currentEnergy: isPro ? state.currentEnergy : state.currentEnergy - 1.0,
       currentIndex: state.currentIndex + 1,
       sessionKeeps: {...state.sessionKeeps, photo.id},
+      lastSwipedPhoto: () => photo,
+      lastSwipeWasDelete: () => false,
       errorMessage: () => null,
     );
 
@@ -316,7 +320,62 @@ class BlitzController extends Notifier<BlitzState> {
       sessionKeeps: const {},
       sessionDeletes: const {},
       sessionDeletedPhotos: const [],
+      lastSwipedPhoto: () => null,
+      lastSwipeWasDelete: () => null,
     );
+  }
+
+  // ====================================================
+  // 核心逻辑 3.5：单步撤销
+  // ====================================================
+
+  /// 撤销上一次滑动操作（仅限最后一张）
+  ///
+  /// 返回值：
+  ///   - `true`  → 撤销成功，状态已回滚
+  ///   - `false` → 无可撤销操作（UI 层据此弹 Toast）
+  ///
+  /// 安全机制：执行完毕后将 lastSwipedPhoto 置为 null，
+  /// 强制锁死连续撤销。
+  bool undoLastSwipe() {
+    final photo = state.lastSwipedPhoto;
+    if (photo == null) return false;
+
+    final wasDelete = state.lastSwipeWasDelete ?? false;
+    final isPro = state.currentEnergy == double.infinity;
+
+    // 1. 从对应的内存草稿中移除
+    final newDeletes = Set<String>.from(state.sessionDeletes);
+    final newKeeps = Set<String>.from(state.sessionKeeps);
+    List<AssetEntity> newDeletedPhotos = List.from(state.sessionDeletedPhotos);
+
+    if (wasDelete) {
+      newDeletes.remove(photo.id);
+      newDeletedPhotos.removeWhere((p) => p.id == photo.id);
+    } else {
+      newKeeps.remove(photo.id);
+    }
+
+    // 2. 回滚状态：体力 +1，索引 -1，哨兵置 null
+    state = state.copyWith(
+      currentEnergy: isPro ? state.currentEnergy : state.currentEnergy + 1.0,
+      currentIndex: state.currentIndex - 1,
+      sessionDeletes: newDeletes,
+      sessionKeeps: newKeeps,
+      sessionDeletedPhotos: newDeletedPhotos,
+      lastSwipedPhoto: () => null,
+      lastSwipeWasDelete: () => null,
+      errorMessage: () => null,
+    );
+
+    // 3. 异步退还体力到 DB（Pro 会员在 consumeEnergy 内部跳过）
+    try {
+      ref.read(userStatsControllerProvider).consumeEnergy(-1.0);
+    } catch (e) {
+      print('[BlitzController] 体力退还失败: $e');
+    }
+
+    return true;
   }
 
   // ====================================================

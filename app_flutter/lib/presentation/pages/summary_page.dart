@@ -19,10 +19,10 @@ class SummaryPage extends ConsumerStatefulWidget {
   final int totalReviewedCount;
 
   const SummaryPage({
-    Key? key,
+    super.key,
     required this.deleteSet,
     this.totalReviewedCount = 0,
-  }) : super(key: key);
+  });
 
   @override
   ConsumerState<SummaryPage> createState() => _SummaryPageState();
@@ -81,8 +81,16 @@ class _SummaryPageState extends ConsumerState<SummaryPage>
     if (widget.deleteSet.isEmpty) {
       _isAllKeptFlow = true;
       _deleteFinished = true;
-      // 首帧渲染后直接播放撒花，跳过信封动画
+      // Bug #4 修复：全员珍藏流必须先提交 Keep 草稿，否则记录全部丢失
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        final currentState = ref.read(blitzControllerProvider);
+        ref.read(userStatsControllerProvider).commitBlitzSession(
+              keeps: currentState.sessionKeeps,
+              deletes: const {},
+              savedBytes: 0,
+            );
+        ref.read(blitzControllerProvider.notifier).clearSessionDraft();
+
         _confettiController.play();
       });
       return;

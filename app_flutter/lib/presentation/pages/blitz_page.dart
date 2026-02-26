@@ -6,6 +6,7 @@ import 'package:appinio_swiper/appinio_swiper.dart';
 import 'package:photo_manager/photo_manager.dart';
 
 import '../controllers/blitz_controller.dart';
+import '../controllers/user_stats_controller.dart';
 import '../widgets/photo_card.dart';
 import 'summary_page.dart';
 
@@ -250,7 +251,20 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
     return PopScope(
       canPop: ref.watch(blitzControllerProvider).sessionDeletes.isEmpty,
       onPopInvoked: (didPop) {
-        if (didPop) return;
+        if (didPop) {
+          // Bug #3 修复：纯右滑退出时，sessionDeletes 为空直接放行，
+          // 但 sessionKeeps 可能不为空，必须静默提交，否则 Keep 记录丢失但体力已扣。
+          final state = ref.read(blitzControllerProvider);
+          if (state.sessionKeeps.isNotEmpty) {
+            ref.read(userStatsControllerProvider).commitBlitzSession(
+                  keeps: state.sessionKeeps,
+                  deletes: const {},
+                  savedBytes: 0,
+                );
+            ref.read(blitzControllerProvider.notifier).clearSessionDraft();
+          }
+          return;
+        }
         _showExitConfirmationBottomSheet();
       },
       child: Scaffold(
@@ -260,9 +274,11 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
     );
   }
 
-  /// 顶部数据大盘 (AppBar 替代) - 根据设计图重构为极简风格
+  /// 顶部数据大盘 (AppBar 替代) - Bug #2 修复：补全进度与体力展示
   Widget _buildTopBar(
       BuildContext context, int currentIndex, int total, double energy) {
+    final bool isPro = energy == double.infinity;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
       child: Row(
@@ -285,13 +301,31 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                     fontSize: 16,
                     fontWeight: FontWeight.w500)),
           ),
-          // 右侧标题
-          const Text(
-            '闪电战模式',
-            style: TextStyle(
-                color: Colors.black45,
-                fontSize: 16,
-                fontWeight: FontWeight.w500),
+          // 中间进度
+          Text(
+            '${currentIndex + 1} / $total',
+            style: const TextStyle(
+              color: Colors.black54,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          // 右侧体力展示
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.bolt_rounded,
+                  color: Color(0xFFD4AF37), size: 20),
+              const SizedBox(width: 4),
+              Text(
+                isPro ? '∞' : '${energy.toInt()}',
+                style: const TextStyle(
+                  color: Color(0xFF4A4238),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -314,9 +348,9 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        // 极简文本滑动手柄 (底部居中靠下)
+        // 极简文本滑动手柄 (底部居中)
         Padding(
-          padding: const EdgeInsets.only(bottom: 10, top: 10), // 控制整体文本离底部的距离
+          padding: const EdgeInsets.only(bottom: 40, top: 10),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -340,7 +374,25 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
               const SizedBox(width: 40),
               GestureDetector(
                 onTap: () {
-                  _swiperController.swipeRight();
+                  final success = ref
+                      .read(blitzControllerProvider.notifier)
+                      .undoLastSwipe();
+                  if (success) {
+                    _swiperController.unswipe();
+                    HapticFeedback.mediumImpact();
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('只能撤回刚刚滑走的那一张照片哦 😅',
+                            textAlign: TextAlign.center),
+                        backgroundColor: const Color(0xFFC75D56),
+                        behavior: SnackBarBehavior.floating,
+                        duration: const Duration(seconds: 2),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                    );
+                  }
                 },
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 30),
@@ -359,24 +411,41 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
           ),
         ),
 
-        // 撕纸贴片风的悬浮撤销按钮 (左侧靠下悬浮，抬高防重叠)
+        // 撕纸贴片风的悬浮撤销按钮 (左侧靠下悬浮)
         Positioned(
           left: 20,
-          bottom: 80, // 从 10 大幅抬升，彻底脱开下方文本的安全距离
+          bottom: 80,
           child: GestureDetector(
             onTap: () {
-              // 触发控制器防呆撤销，如果不能撤销则无反应
-              _swiperController.unswipe();
-              // 在 controller 层级我们可以添加自己的弹回逻辑或音效
-              HapticFeedback.lightImpact();
+              final success =
+                  ref.read(blitzControllerProvider.notifier).undoLastSwipe();
+              if (success) {
+                _swiperController.unswipe();
+                HapticFeedback.mediumImpact();
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text(
+                      '只能撤回刚刚滑走的那一张照片哦 😅',
+                      textAlign: TextAlign.center,
+                    ),
+                    backgroundColor: const Color(0xFFC75D56),
+                    behavior: SnackBarBehavior.floating,
+                    duration: const Duration(seconds: 2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                );
+              }
             },
             child: Transform.rotate(
-              angle: -0.05, // 微微倾斜更加随意
+              angle: -0.05,
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 8), // 缩小内边距
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF0EBE2), // 泛黄的裁纸色
+                  color: const Color(0xFFF0EBE2),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.05),
@@ -384,7 +453,6 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                       offset: const Offset(2, 2),
                     ),
                   ],
-                  // 使用一点非对称圆角模拟胶带撕下的痕迹
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(2),
                     bottomLeft: Radius.circular(8),
@@ -398,14 +466,14 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                     Icon(
                       Icons.replay_rounded,
                       color: Colors.black45,
-                      size: 14, // 缩小图标
+                      size: 14,
                     ),
                     SizedBox(width: 4),
                     Text(
                       '撤销',
                       style: TextStyle(
                         color: Colors.black54,
-                        fontSize: 14, // 缩小字号
+                        fontSize: 14,
                         fontWeight: FontWeight.w500,
                         letterSpacing: 1,
                       ),
@@ -531,6 +599,10 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                 return;
               }
               _handleSwipeEnd(activity, notifier, photos[previousIndex]);
+            },
+            onUnSwipe: (SwiperActivity activity) {
+              // 3. 动画引擎确认飞回后，正式命令底层控制器将体力+1，并且把记录从 Deletes/Keeps 中拔除！
+              ref.read(blitzControllerProvider.notifier).undoLastSwipe();
             },
             onEnd: () {
               final currentState = ref.read(blitzControllerProvider);

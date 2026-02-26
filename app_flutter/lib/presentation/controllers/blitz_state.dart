@@ -51,6 +51,12 @@ class BlitzState {
   /// 仅在结算时通过 commitBlitzSession 批量写入数据库
   final Set<String> sessionDeletes;
 
+  /// 单步撤销哨兵：上一张被滑走的照片实体（null = 不可撤销）
+  final AssetEntity? lastSwipedPhoto;
+
+  /// 单步撤销哨兵：上一次操作是否为删除（null = 不可撤销）
+  final bool? lastSwipeWasDelete;
+
   /// 已左滑删除的照片计数 (通过列表长度获取)
   int get deletedCount => sessionDeletedPhotos.length;
 
@@ -64,6 +70,8 @@ class BlitzState {
     this.thumbnailCache = const {},
     this.sessionKeeps = const {},
     this.sessionDeletes = const {},
+    this.lastSwipedPhoto,
+    this.lastSwipeWasDelete,
   });
 
   /// 便捷 getter：是否还有下一张照片可处理
@@ -89,6 +97,8 @@ class BlitzState {
     Map<String, Uint8List>? thumbnailCache,
     Set<String>? sessionKeeps,
     Set<String>? sessionDeletes,
+    AssetEntity? Function()? lastSwipedPhoto,
+    bool? Function()? lastSwipeWasDelete,
   }) {
     return BlitzState(
       photos: photos ?? this.photos,
@@ -101,6 +111,11 @@ class BlitzState {
       thumbnailCache: thumbnailCache ?? this.thumbnailCache,
       sessionKeeps: sessionKeeps ?? this.sessionKeeps,
       sessionDeletes: sessionDeletes ?? this.sessionDeletes,
+      lastSwipedPhoto:
+          lastSwipedPhoto != null ? lastSwipedPhoto() : this.lastSwipedPhoto,
+      lastSwipeWasDelete: lastSwipeWasDelete != null
+          ? lastSwipeWasDelete()
+          : this.lastSwipeWasDelete,
     );
   }
 
@@ -108,5 +123,6 @@ class BlitzState {
   String toString() =>
       'BlitzState(photos: ${photos.length}, index: $currentIndex, '
       'energy: $currentEnergy, loading: $isLoading, '
-      'keeps: ${sessionKeeps.length}, deletes: ${sessionDeletes.length})';
+      'keeps: ${sessionKeeps.length}, deletes: ${sessionDeletes.length}, '
+      'canUndo: ${lastSwipedPhoto != null})';
 }
