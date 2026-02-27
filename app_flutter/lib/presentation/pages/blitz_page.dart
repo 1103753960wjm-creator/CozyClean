@@ -23,6 +23,36 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
 
   // 导航保险锁，避免同时触发监听器和插件的回调
   bool _isNavigating = false;
+  bool _isUndoAnimating = false;
+
+  void _triggerUndoAnimation() {
+    if (!mounted) return;
+    setState(() => _isUndoAnimating = true);
+    Future<void>.delayed(const Duration(milliseconds: 450), () {
+      if (!mounted) return;
+      setState(() => _isUndoAnimating = false);
+    });
+  }
+
+  void _requestUndo() {
+    final canUndo = ref.read(blitzControllerProvider).lastSwipedPhoto != null;
+    if (!canUndo) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('只能撤回刚刚滑走的那一张照片哦 😅', textAlign: TextAlign.center),
+          backgroundColor: const Color(0xFFC75D56),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      return;
+    }
+
+    _swiperController.unswipe();
+    HapticFeedback.mediumImpact();
+    _triggerUndoAnimation();
+  }
 
   void _navigateToSummary(List<AssetEntity> deleteSet) {
     if (_isNavigating) return;
@@ -374,25 +404,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
               const SizedBox(width: 40),
               GestureDetector(
                 onTap: () {
-                  final success = ref
-                      .read(blitzControllerProvider.notifier)
-                      .undoLastSwipe();
-                  if (success) {
-                    _swiperController.unswipe();
-                    HapticFeedback.mediumImpact();
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('只能撤回刚刚滑走的那一张照片哦 😅',
-                            textAlign: TextAlign.center),
-                        backgroundColor: const Color(0xFFC75D56),
-                        behavior: SnackBarBehavior.floating,
-                        duration: const Duration(seconds: 2),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                      ),
-                    );
-                  }
+                  _swiperController.swipeRight();
                 },
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 30),
@@ -417,27 +429,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
           bottom: 80,
           child: GestureDetector(
             onTap: () {
-              final success =
-                  ref.read(blitzControllerProvider.notifier).undoLastSwipe();
-              if (success) {
-                _swiperController.unswipe();
-                HapticFeedback.mediumImpact();
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text(
-                      '只能撤回刚刚滑走的那一张照片哦 😅',
-                      textAlign: TextAlign.center,
-                    ),
-                    backgroundColor: const Color(0xFFC75D56),
-                    behavior: SnackBarBehavior.floating,
-                    duration: const Duration(seconds: 2),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                );
-              }
+              _requestUndo();
             },
             child: Transform.rotate(
               angle: -0.05,
@@ -479,6 +471,35 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                       ),
                     ),
                   ],
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        Positioned(
+          left: 16,
+          bottom: 138,
+          child: AnimatedSlide(
+            duration: const Duration(milliseconds: 280),
+            offset: _isUndoAnimating ? Offset.zero : const Offset(0.28, 0),
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 240),
+              opacity: _isUndoAnimating ? 1 : 0,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.95),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Text(
+                  '↩ 照片飞回中',
+                  style: TextStyle(
+                    color: Color(0xFF8BA888),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
