@@ -1,16 +1,46 @@
-﻿import 'dart:typed_data';
+/// CozyClean — 闪电战核心展示主页
+///
+/// UI 层职责说明：
+///   本页面是分层架构中的 **纯展示层**，职责严格限定为：
+///   1. 通过 ref.watch 监听 [BlitzState] 的变化并重建 UI
+///   2. 通过 ref.read 调用 [BlitzController] 的方法响应用户交互
+///   3. 管理页面级的动画状态（如撤销反馈动效）
+///
+///   本页面 **不负责** 以下逻辑：
+///   - ❌ 访问数据库（AppDatabase）
+///   - ❌ 访问相册（PhotoManager）
+///   - ❌ 执行连拍分组（BurstGroupingService）
+///   - ❌ 管理体力值计算
+///   - ❌ 管理照片去重过滤
+///
+///   这样做的原因：
+///   - build() 保持纯净，不包含任何 IO 或计算密集操作
+///   - 业务逻辑变更时只需修改 Controller，UI 无需改动
+///   - 便于独立测试 UI 组件（Mock Controller 即可）
+///
+/// 图片展示策略：
+///   使用 photo_manager 的 [AssetEntityImage] 组件，
+///   设置 isOriginal: false 确保只加载缩略图，
+///   绝不在列表视图中加载原图（规范第 5、11 条）。
+library;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:appinio_swiper/appinio_swiper.dart';
 import 'package:photo_manager/photo_manager.dart';
+import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 
-import '../controllers/blitz_controller.dart';
-import '../controllers/user_stats_controller.dart';
-import '../widgets/photo_card.dart';
-import 'summary_page.dart';
+import 'package:cozy_clean/features/blitz/application/controllers/blitz_controller.dart';
+import 'package:cozy_clean/features/blitz/application/state/blitz_state.dart';
+import 'package:cozy_clean/features/blitz/domain/models/photo_group.dart';
+import 'package:cozy_clean/presentation/controllers/user_stats_controller.dart';
+import 'package:cozy_clean/presentation/pages/summary_page.dart';
 
 /// 闪电战核心展示主页
+///
+/// 纯展示组件，所有交互均委托给 [BlitzController]。
+/// build() 方法中不包含任何 IO、数据库、相册访问或业务计算。
 class BlitzPage extends ConsumerStatefulWidget {
   const BlitzPage({super.key});
 
@@ -21,10 +51,36 @@ class BlitzPage extends ConsumerStatefulWidget {
 class _BlitzPageState extends ConsumerState<BlitzPage> {
   final AppinioSwiperController _swiperController = AppinioSwiperController();
 
-  // 导航保险锁，避免同时触发监听器和插件的回调
+  /// 导航保险锁，避免同时触发监听器和插件的回调
   bool _isNavigating = false;
+
+  /// 撤销动效播放标志
   bool _isUndoAnimating = false;
 
+  // ============================================================
+  // 生命周期
+  // ============================================================
+
+  @override
+  void initState() {
+    super.initState();
+    // 委托 Controller 加载照片（所有 IO 在 Controller 内完成）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(blitzControllerProvider.notifier).loadPhotos();
+    });
+  }
+
+  @override
+  void dispose() {
+    _swiperController.dispose();
+    super.dispose();
+  }
+
+  // ============================================================
+  // 页面级交互方法（仅调用 Controller，不含业务逻辑）
+  // ============================================================
+
+  /// 触发撤销反馈动效（纯 UI 行为）
   void _triggerUndoAnimation() {
     if (!mounted) return;
     setState(() => _isUndoAnimating = true);
@@ -34,6 +90,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
     });
   }
 
+  /// 请求撤销上一次滑动 — 调用 Controller 并播放 UI 反馈
   void _requestUndo() {
     final success = ref.read(blitzControllerProvider.notifier).undoLastSwipe();
     if (!success) {
@@ -56,69 +113,86 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
     _triggerUndoAnimation();
   }
 
-  void _navigateToSummary(List<AssetEntity> deleteSet) {
+  /// 导航到结算页 — 纯路由操作
+  void _navigateToSummary(List<AssetEntity> skippedPhotos) {
     if (_isNavigating) return;
     _isNavigating = true;
 
-    final totalReviewed = ref.read(blitzControllerProvider).photos.length;
+    final state = ref.read(blitzControllerProvider);
+    final totalReviewed = state.photoGroups.length;
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (context) => SummaryPage(
-          deleteSet: deleteSet,
+          deleteSet: skippedPhotos,
           totalReviewedCount: totalReviewed,
         ),
       ),
     );
   }
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(blitzControllerProvider.notifier).loadPhotos();
-    });
+  /// 处理滑动结束事件 — 调用 Controller 方法
+  Future<void> _handleSwipeEnd(
+    SwiperActivity activity,
+    AssetEntity photo,
+  ) async {
+    final notifier = ref.read(blitzControllerProvider.notifier);
+
+    if (activity is Swipe) {
+      if (activity.direction == AxisDirection.left) {
+        HapticFeedback.mediumImpact();
+        final success = await notifier.swipeLeft(photo);
+        if (!success) {
+          _swiperController.unswipe();
+          _showNoEnergyWarning();
+        }
+      } else if (activity.direction == AxisDirection.right) {
+        HapticFeedback.lightImpact();
+        final success = await notifier.swipeRight(photo);
+        if (!success) {
+          _swiperController.unswipe();
+          _showNoEnergyWarning();
+        }
+      }
+    }
   }
 
-  @override
-  void dispose() {
-    _swiperController.dispose();
-    super.dispose();
-  }
+  // ============================================================
+  // build — 纯展示，无 IO / 无计算
+  // ============================================================
 
   @override
   Widget build(BuildContext context) {
-    final isLoading =
-        ref.watch(blitzControllerProvider.select((s) => s.isLoading));
-    final errorMessage =
-        ref.watch(blitzControllerProvider.select((s) => s.errorMessage));
-    final photos = ref.watch(blitzControllerProvider.select((s) => s.photos));
-    final thumbnailCache =
-        ref.watch(blitzControllerProvider.select((s) => s.thumbnailCache));
-    final notifier = ref.read(blitzControllerProvider.notifier);
+    final blitzState = ref.watch(blitzControllerProvider);
 
+    // 监听全部处理完毕 → 自动跳转结算页
     ref.listen(blitzControllerProvider, (previous, next) {
-      if (!next.isLoading && next.photos.isNotEmpty && !next.hasNextPhoto) {
-        _navigateToSummary(next.sessionDeletedPhotos);
+      if (!next.isLoading &&
+          next.photoGroups.isNotEmpty &&
+          !next.hasNextGroup) {
+        _navigateToSummary(next.skipped);
       }
     });
 
-    if (isLoading) {
+    if (blitzState.isLoading) {
       return _buildScaffold(
-          context,
-          const Center(
-              child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation(Color(0xFF8BA888)))));
+        context,
+        const Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation(Color(0xFF8BA888)),
+          ),
+        ),
+      );
     }
 
-    if (errorMessage != null) {
+    if (blitzState.errorMessage != null) {
       return _buildScaffold(
         context,
         Center(
           child: Padding(
             padding: const EdgeInsets.all(20.0),
             child: Text(
-              errorMessage,
+              blitzState.errorMessage!,
               textAlign: TextAlign.center,
               style: const TextStyle(color: Colors.redAccent, fontSize: 16),
             ),
@@ -126,7 +200,8 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
         ),
       );
     }
-    if (photos.isEmpty) {
+
+    if (blitzState.photoGroups.isEmpty) {
       return _buildScaffold(context, _buildEmptyState());
     }
 
@@ -134,35 +209,30 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
       context,
       Column(
         children: [
-          Consumer(builder: (context, ref, child) {
-            final currentIndex = ref
-                .watch(blitzControllerProvider.select((s) => s.currentIndex));
-            final currentEnergy = ref
-                .watch(blitzControllerProvider.select((s) => s.currentEnergy));
-
-            return _buildTopBar(
-              context,
-              currentIndex < photos.length ? currentIndex : photos.length - 1,
-              photos.length,
-              currentEnergy,
-            );
-          }),
-
-          Expanded(
-            child: _buildSwiperContainer(photos, thumbnailCache, notifier),
+          _buildTopBar(
+            context,
+            blitzState.currentGroupIndex < blitzState.photoGroups.length
+                ? blitzState.currentGroupIndex
+                : blitzState.photoGroups.length - 1,
+            blitzState.photoGroups.length,
+            blitzState.currentEnergy,
           ),
-
-          // 调用完全修复后的底部按钮
+          Expanded(
+            child: _buildSwiperContainer(blitzState),
+          ),
           _buildActionButtons(),
         ],
       ),
     );
   }
 
+  // ============================================================
+  // UI 组件构建方法
+  // ============================================================
+
+  /// 退出确认底部弹窗
   void _showExitConfirmationBottomSheet() {
-    final sessionDeletes = ref.read(blitzControllerProvider).sessionDeletes;
-    final deletedPhotos =
-        ref.read(blitzControllerProvider).sessionDeletedPhotos;
+    final state = ref.read(blitzControllerProvider);
 
     showModalBottomSheet(
       context: context,
@@ -181,7 +251,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                '等等！', // 【已修复乱码】
+                '等等！',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -190,11 +260,8 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
               ),
               const SizedBox(height: 12),
               Text(
-                '你有 ${sessionDeletes.length} 张废片待清理，要现在归档吗？',
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Colors.black54,
-                ),
+                '你有 ${state.skippedCount} 张废片待清理，要现在归档吗？',
+                style: const TextStyle(fontSize: 16, color: Colors.black54),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
@@ -210,6 +277,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                         ),
                       ),
                       onPressed: () {
+                        // 清空内存草稿，放弃本次操作
                         ref
                             .read(blitzControllerProvider.notifier)
                             .clearSessionDraft();
@@ -239,7 +307,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                       ),
                       onPressed: () {
                         Navigator.of(ctx).pop();
-                        _navigateToSummary(deletedPhotos);
+                        _navigateToSummary(state.skipped);
                       },
                       child: const Text(
                         '这就去清',
@@ -261,15 +329,17 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
     );
   }
 
+  /// 页面脚手架（含返回拦截）
   Widget _buildScaffold(BuildContext context, Widget child) {
     return PopScope(
-      canPop: ref.watch(blitzControllerProvider).sessionDeletes.isEmpty,
+      canPop: ref.watch(blitzControllerProvider).skipped.isEmpty,
       onPopInvoked: (didPop) {
         if (didPop) {
+          // 无废片时直接退出，但如有收藏需提交
           final state = ref.read(blitzControllerProvider);
-          if (state.sessionKeeps.isNotEmpty) {
+          if (state.favorites.isNotEmpty) {
             ref.read(userStatsControllerProvider).commitBlitzSession(
-                  keeps: state.sessionKeeps,
+                  keeps: state.favorites.map((p) => p.id).toSet(),
                   deletes: const {},
                   savedBytes: 0,
                 );
@@ -286,6 +356,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
     );
   }
 
+  /// 顶部信息栏
   Widget _buildTopBar(
       BuildContext context, int currentIndex, int total, double energy) {
     final bool isPro = energy == double.infinity;
@@ -296,10 +367,9 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           GestureDetector(
-            onTap: () async {
-              final sessionDeletes =
-                  ref.read(blitzControllerProvider).sessionDeletes;
-              if (sessionDeletes.isEmpty) {
+            onTap: () {
+              final state = ref.read(blitzControllerProvider);
+              if (state.skipped.isEmpty) {
                 Navigator.maybePop(context);
               } else {
                 _showExitConfirmationBottomSheet();
@@ -326,7 +396,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                   color: Color(0xFFD4AF37), size: 20),
               const SizedBox(width: 4),
               Text(
-                isPro ? '∞' : '${energy.toInt()}', // 【已修复乱码】
+                isPro ? '∞' : '${energy.toInt()}',
                 style: const TextStyle(
                   color: Color(0xFF4A4238),
                   fontSize: 16,
@@ -340,7 +410,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
     );
   }
 
-  /// 极致手账风：全部整理完毕的空状态展示
+  /// 全部整理完毕的空状态展示
   Widget _buildEmptyState() {
     return Center(
       child: Padding(
@@ -348,7 +418,6 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // 圆形背景托底的大图标（模拟插画效果）
             Container(
               padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
@@ -356,14 +425,12 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                 shape: BoxShape.circle,
               ),
               child: const Icon(
-                Icons.task_alt_rounded, // 成功/完成的图标
+                Icons.task_alt_rounded,
                 size: 80,
                 color: Color(0xFF8BA888),
               ),
             ),
             const SizedBox(height: 32),
-
-            // 标题
             const Text(
               '太棒了！',
               style: TextStyle(
@@ -374,8 +441,6 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // 副标题
             const Text(
               '相册里的废片已经全部清理完毕\n今天也是清爽的一天哦 ✨',
               textAlign: TextAlign.center,
@@ -386,30 +451,22 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
               ),
             ),
             const SizedBox(height: 50),
-
-            // 重新整理一次 核心按钮
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF8BA888),
                 foregroundColor: Colors.white,
                 elevation: 0,
-                minimumSize: const Size(double.infinity, 56), // 宽大、厚实的按钮
+                minimumSize: const Size(double.infinity, 56),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
-                // 增加一点轻微的阴影让它更有质感
                 shadowColor: const Color(0xFF8BA888).withOpacity(0.4),
               ),
-              onPressed: () async {
-                // 1. 触发轻微震动反馈
-                HapticFeedback.lightImpact();
-
-                // 2. 核心架构逻辑：清空本地数据库中的“已阅”记录，释放所有照片！
-                final db = ref.read(appDatabaseProvider);
-                await db.delete(db.photoActions).go();
-
-                // 3. 重新向相册要数据，开启新的一轮闪电战
-                ref.read(blitzControllerProvider.notifier).loadPhotos();
+              onPressed: () {
+                // 委托 Controller 处理（不直接访问数据库）
+                ref
+                    .read(blitzControllerProvider.notifier)
+                    .resetAllPhotoActions();
               },
               child: const Text(
                 '重新整理一次',
@@ -426,10 +483,10 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
     );
   }
 
-  // 【已修复：幽灵按钮边界重绘】
+  /// 底部操作按钮（丢弃 / 保留 / 撤销）
   Widget _buildActionButtons() {
     return SizedBox(
-      height: 100, // 给予安全的物理包围盒
+      height: 100,
       width: double.infinity,
       child: Stack(
         clipBehavior: Clip.none,
@@ -439,11 +496,9 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               GestureDetector(
-                onTap: () {
-                  _swiperController.swipeLeft();
-                },
+                onTap: () => _swiperController.swipeLeft(),
                 child: Container(
-                  color: Colors.transparent, // 放大点击热区
+                  color: Colors.transparent,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
                   child: Text(
@@ -459,11 +514,9 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
               ),
               const SizedBox(width: 40),
               GestureDetector(
-                onTap: () {
-                  _swiperController.swipeRight();
-                },
+                onTap: () => _swiperController.swipeRight(),
                 child: Container(
-                  color: Colors.transparent, // 放大点击热区
+                  color: Colors.transparent,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
                   child: Text(
@@ -479,13 +532,12 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
               ),
             ],
           ),
+          // 撤销按钮
           Positioned(
             left: 20,
             bottom: 70,
             child: GestureDetector(
-              onTap: () {
-                _requestUndo();
-              },
+              onTap: _requestUndo,
               child: Transform.rotate(
                 angle: -0.05,
                 child: Container(
@@ -510,11 +562,8 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.replay_rounded,
-                        color: Colors.black45,
-                        size: 14,
-                      ),
+                      Icon(Icons.replay_rounded,
+                          color: Colors.black45, size: 14),
                       SizedBox(width: 4),
                       Text(
                         '撤销',
@@ -531,6 +580,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
               ),
             ),
           ),
+          // 撤销动效标签
           Positioned(
             left: 16,
             bottom: 138,
@@ -564,6 +614,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
     );
   }
 
+  /// 体力耗尽警告弹窗
   void _showNoEnergyWarning() {
     showModalBottomSheet(
       context: context,
@@ -592,10 +643,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
               const SizedBox(height: 12),
               const Text(
                 '今日体力已耗尽，解锁PRO获取无限体力',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.black54,
-                ),
+                style: TextStyle(fontSize: 16, color: Colors.black54),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
@@ -603,15 +651,13 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   minimumSize: const Size(double.infinity, 50),
-                  backgroundColor: const Color(0xFFD4AF37), // 金色
+                  backgroundColor: const Color(0xFFD4AF37),
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                onPressed: () {
-                  Navigator.of(ctx).pop();
-                },
+                onPressed: () => Navigator.of(ctx).pop(),
                 child: const Text(
                   '了解 PRO 权益',
                   style: TextStyle(
@@ -629,69 +675,186 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
     );
   }
 
-  void _handleSwipeEnd(
-      SwiperActivity activity, dynamic notifier, dynamic photo) async {
-    if (activity is Swipe) {
-      if (activity.direction == AxisDirection.left) {
-        HapticFeedback.mediumImpact();
-        final success = await notifier.swipeLeft(photo);
-        if (!success) {
-          _swiperController.unswipe();
-          _showNoEnergyWarning();
-        }
-      } else if (activity.direction == AxisDirection.right) {
-        HapticFeedback.lightImpact();
-        final success = await notifier.swipeRight(photo);
-        if (!success) {
-          _swiperController.unswipe();
-          _showNoEnergyWarning();
-        }
-      }
-    }
-  }
+  /// Swiper 卡片容器
+  ///
+  /// 使用 [AssetEntityImage] 展示缩略图（isOriginal: false），
+  /// 绝不在列表中加载原图（规范第 5 条）。
+  Widget _buildSwiperContainer(BlitzState blitzState) {
+    final groups = blitzState.photoGroups;
 
-  Widget _buildSwiperContainer(List<AssetEntity> photos,
-      Map<String, Uint8List> thumbnailCache, BlitzController notifier) {
     return Center(
       child: AspectRatio(
         aspectRatio: 0.80,
         child: Padding(
-          padding: const EdgeInsets.only(
-              left: 30, right: 30, bottom: 20), // 已适配底部操作栏高度
+          padding: const EdgeInsets.only(left: 30, right: 30, bottom: 20),
           child: AppinioSwiper(
             controller: _swiperController,
-            cardCount: photos.length,
+            cardCount: groups.length,
             backgroundCardCount: 2,
             backgroundCardScale: 0.92,
             backgroundCardOffset: const Offset(0, 15),
-            // 【已彻底删除 onUnSwipe 毒瘤监听器，防止退回吞卡片 Bug】
             onSwipeEnd:
                 (int previousIndex, int targetIndex, SwiperActivity activity) {
-              if (previousIndex < 0 || previousIndex >= photos.length) {
-                return;
-              }
-              _handleSwipeEnd(activity, notifier, photos[previousIndex]);
+              if (previousIndex < 0 || previousIndex >= groups.length) return;
+              final photo = groups[previousIndex].bestPhoto;
+              _handleSwipeEnd(activity, photo);
             },
             onEnd: () {
               final currentState = ref.read(blitzControllerProvider);
-              _navigateToSummary(currentState.sessionDeletedPhotos);
+              _navigateToSummary(currentState.skipped);
             },
             cardBuilder: (BuildContext context, int index) {
-              if (index < 0 || index >= photos.length) {
+              if (index < 0 || index >= groups.length) {
                 return const SizedBox.shrink();
               }
-              final photo = photos[index];
+              final group = groups[index];
+              final photo = group.bestPhoto;
 
-              return PhotoCard(
-                key: ValueKey(photo.id),
-                imageData: thumbnailCache[photo.id],
-                swiperController: _swiperController,
-                index: index,
-              );
+              return _buildPhotoCard(photo, group);
             },
           ),
         ),
       ),
+    );
+  }
+
+  /// 拍立得风格照片卡片
+  ///
+  /// 使用 [AssetEntityImage] 直接渲染缩略图，
+  /// isOriginal: false 确保内存安全（规范第 5、11 条）。
+  Widget _buildPhotoCard(AssetEntity photo, PhotoGroup group) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(4),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.18),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 30,
+            spreadRadius: 4,
+            offset: const Offset(0, 15),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(
+                  left: 14, right: 14, top: 14, bottom: 2),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // 照片层 — 使用 AssetEntityImage 缩略图
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                          color: Colors.black.withOpacity(0.05), width: 1),
+                    ),
+                    child: AssetEntityImage(
+                      photo,
+                      isOriginal: false,
+                      thumbnailSize: const ThumbnailSize(800, 800),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: const Color(0xFFF0EBE2),
+                          alignment: Alignment.center,
+                          child: const Icon(Icons.broken_image_rounded,
+                              size: 48, color: Colors.black26),
+                        );
+                      },
+                    ),
+                  ),
+                  // 连拍标记
+                  if (group.isBurst)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${group.count} 张连拍',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  // 印章层
+                  if (_swiperController.cardIndex != null)
+                    _buildStampLayer(photo),
+                ],
+              ),
+            ),
+          ),
+          // 底部留白
+          const SizedBox(height: 60),
+        ],
+      ),
+    );
+  }
+
+  /// 随滑动幅度渐显的印章层
+  Widget _buildStampLayer(AssetEntity photo) {
+    return ListenableBuilder(
+      listenable: _swiperController,
+      builder: (context, child) {
+        if (_swiperController.swipeProgress == null) {
+          return const SizedBox.shrink();
+        }
+
+        final double dx = _swiperController.swipeProgress!.dx;
+        if (dx == 0) return const SizedBox.shrink();
+
+        final double opacity = (dx.abs() * 1.5).clamp(0.0, 1.0);
+        final bool isDiscard = dx < 0;
+
+        final Color stampColor =
+            isDiscard ? const Color(0xFFB71C1C) : const Color(0xFF5A7D55);
+
+        return Positioned(
+          top: 20,
+          left: isDiscard ? null : 20,
+          right: isDiscard ? 20 : null,
+          child: Opacity(
+            opacity: opacity,
+            child: Transform.rotate(
+              angle: isDiscard ? 0.2 : -0.2,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                decoration: BoxDecoration(
+                  border: Border.all(color: stampColor, width: 3.5),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  isDiscard ? 'DISCARD' : 'KEEP',
+                  style: TextStyle(
+                    color: stampColor,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
