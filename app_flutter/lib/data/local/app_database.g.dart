@@ -1044,18 +1044,329 @@ class PhotoActionsCompanion extends UpdateCompanion<PhotoAction> {
   }
 }
 
+class $JournalsTable extends Journals with TableInfo<$JournalsTable, Journal> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $JournalsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+      'title', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _photoIdsMeta =
+      const VerificationMeta('photoIds');
+  @override
+  late final GeneratedColumn<String> photoIds = GeneratedColumn<String>(
+      'photo_ids', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _posterPathMeta =
+      const VerificationMeta('posterPath');
+  @override
+  late final GeneratedColumn<String> posterPath = GeneratedColumn<String>(
+      'poster_path', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [id, title, photoIds, posterPath, createdAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'journals';
+  @override
+  VerificationContext validateIntegrity(Insertable<Journal> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+          _titleMeta, title.isAcceptableOrUnknown(data['title']!, _titleMeta));
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('photo_ids')) {
+      context.handle(_photoIdsMeta,
+          photoIds.isAcceptableOrUnknown(data['photo_ids']!, _photoIdsMeta));
+    } else if (isInserting) {
+      context.missing(_photoIdsMeta);
+    }
+    if (data.containsKey('poster_path')) {
+      context.handle(
+          _posterPathMeta,
+          posterPath.isAcceptableOrUnknown(
+              data['poster_path']!, _posterPathMeta));
+    } else if (isInserting) {
+      context.missing(_posterPathMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Journal map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Journal(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      title: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}title'])!,
+      photoIds: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}photo_ids'])!,
+      posterPath: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}poster_path'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $JournalsTable createAlias(String alias) {
+    return $JournalsTable(attachedDatabase, alias);
+  }
+}
+
+class Journal extends DataClass implements Insertable<Journal> {
+  /// 自增 ID
+  final int id;
+
+  /// 海报标题（用户可编辑，默认使用日期）
+  final String title;
+
+  /// 收藏照片的 Asset ID 列表（JSON 序列化）
+  ///
+  /// 示例: '["id1","id2","id3"]'
+  final String photoIds;
+
+  /// 海报图片在本地文件系统中的绝对路径
+  final String posterPath;
+
+  /// 海报创建时间
+  final DateTime createdAt;
+  const Journal(
+      {required this.id,
+      required this.title,
+      required this.photoIds,
+      required this.posterPath,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['title'] = Variable<String>(title);
+    map['photo_ids'] = Variable<String>(photoIds);
+    map['poster_path'] = Variable<String>(posterPath);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  JournalsCompanion toCompanion(bool nullToAbsent) {
+    return JournalsCompanion(
+      id: Value(id),
+      title: Value(title),
+      photoIds: Value(photoIds),
+      posterPath: Value(posterPath),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory Journal.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Journal(
+      id: serializer.fromJson<int>(json['id']),
+      title: serializer.fromJson<String>(json['title']),
+      photoIds: serializer.fromJson<String>(json['photoIds']),
+      posterPath: serializer.fromJson<String>(json['posterPath']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'title': serializer.toJson<String>(title),
+      'photoIds': serializer.toJson<String>(photoIds),
+      'posterPath': serializer.toJson<String>(posterPath),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  Journal copyWith(
+          {int? id,
+          String? title,
+          String? photoIds,
+          String? posterPath,
+          DateTime? createdAt}) =>
+      Journal(
+        id: id ?? this.id,
+        title: title ?? this.title,
+        photoIds: photoIds ?? this.photoIds,
+        posterPath: posterPath ?? this.posterPath,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  Journal copyWithCompanion(JournalsCompanion data) {
+    return Journal(
+      id: data.id.present ? data.id.value : this.id,
+      title: data.title.present ? data.title.value : this.title,
+      photoIds: data.photoIds.present ? data.photoIds.value : this.photoIds,
+      posterPath:
+          data.posterPath.present ? data.posterPath.value : this.posterPath,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Journal(')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('photoIds: $photoIds, ')
+          ..write('posterPath: $posterPath, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, title, photoIds, posterPath, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Journal &&
+          other.id == this.id &&
+          other.title == this.title &&
+          other.photoIds == this.photoIds &&
+          other.posterPath == this.posterPath &&
+          other.createdAt == this.createdAt);
+}
+
+class JournalsCompanion extends UpdateCompanion<Journal> {
+  final Value<int> id;
+  final Value<String> title;
+  final Value<String> photoIds;
+  final Value<String> posterPath;
+  final Value<DateTime> createdAt;
+  const JournalsCompanion({
+    this.id = const Value.absent(),
+    this.title = const Value.absent(),
+    this.photoIds = const Value.absent(),
+    this.posterPath = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  JournalsCompanion.insert({
+    this.id = const Value.absent(),
+    required String title,
+    required String photoIds,
+    required String posterPath,
+    this.createdAt = const Value.absent(),
+  })  : title = Value(title),
+        photoIds = Value(photoIds),
+        posterPath = Value(posterPath);
+  static Insertable<Journal> custom({
+    Expression<int>? id,
+    Expression<String>? title,
+    Expression<String>? photoIds,
+    Expression<String>? posterPath,
+    Expression<DateTime>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (title != null) 'title': title,
+      if (photoIds != null) 'photo_ids': photoIds,
+      if (posterPath != null) 'poster_path': posterPath,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  JournalsCompanion copyWith(
+      {Value<int>? id,
+      Value<String>? title,
+      Value<String>? photoIds,
+      Value<String>? posterPath,
+      Value<DateTime>? createdAt}) {
+    return JournalsCompanion(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      photoIds: photoIds ?? this.photoIds,
+      posterPath: posterPath ?? this.posterPath,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (photoIds.present) {
+      map['photo_ids'] = Variable<String>(photoIds.value);
+    }
+    if (posterPath.present) {
+      map['poster_path'] = Variable<String>(posterPath.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('JournalsCompanion(')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('photoIds: $photoIds, ')
+          ..write('posterPath: $posterPath, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $LocalUserStatsTable localUserStats = $LocalUserStatsTable(this);
   late final $SessionLogsTable sessionLogs = $SessionLogsTable(this);
   late final $PhotoActionsTable photoActions = $PhotoActionsTable(this);
+  late final $JournalsTable journals = $JournalsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities =>
-      [localUserStats, sessionLogs, photoActions];
+      [localUserStats, sessionLogs, photoActions, journals];
 }
 
 typedef $$LocalUserStatsTableCreateCompanionBuilder = LocalUserStatsCompanion
@@ -1611,6 +1922,165 @@ typedef $$PhotoActionsTableProcessedTableManager = ProcessedTableManager<
     ),
     PhotoAction,
     PrefetchHooks Function()>;
+typedef $$JournalsTableCreateCompanionBuilder = JournalsCompanion Function({
+  Value<int> id,
+  required String title,
+  required String photoIds,
+  required String posterPath,
+  Value<DateTime> createdAt,
+});
+typedef $$JournalsTableUpdateCompanionBuilder = JournalsCompanion Function({
+  Value<int> id,
+  Value<String> title,
+  Value<String> photoIds,
+  Value<String> posterPath,
+  Value<DateTime> createdAt,
+});
+
+class $$JournalsTableFilterComposer
+    extends Composer<_$AppDatabase, $JournalsTable> {
+  $$JournalsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get photoIds => $composableBuilder(
+      column: $table.photoIds, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get posterPath => $composableBuilder(
+      column: $table.posterPath, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$JournalsTableOrderingComposer
+    extends Composer<_$AppDatabase, $JournalsTable> {
+  $$JournalsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get photoIds => $composableBuilder(
+      column: $table.photoIds, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get posterPath => $composableBuilder(
+      column: $table.posterPath, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$JournalsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $JournalsTable> {
+  $$JournalsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get photoIds =>
+      $composableBuilder(column: $table.photoIds, builder: (column) => column);
+
+  GeneratedColumn<String> get posterPath => $composableBuilder(
+      column: $table.posterPath, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$JournalsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $JournalsTable,
+    Journal,
+    $$JournalsTableFilterComposer,
+    $$JournalsTableOrderingComposer,
+    $$JournalsTableAnnotationComposer,
+    $$JournalsTableCreateCompanionBuilder,
+    $$JournalsTableUpdateCompanionBuilder,
+    (Journal, BaseReferences<_$AppDatabase, $JournalsTable, Journal>),
+    Journal,
+    PrefetchHooks Function()> {
+  $$JournalsTableTableManager(_$AppDatabase db, $JournalsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$JournalsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$JournalsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$JournalsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<String> title = const Value.absent(),
+            Value<String> photoIds = const Value.absent(),
+            Value<String> posterPath = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+          }) =>
+              JournalsCompanion(
+            id: id,
+            title: title,
+            photoIds: photoIds,
+            posterPath: posterPath,
+            createdAt: createdAt,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required String title,
+            required String photoIds,
+            required String posterPath,
+            Value<DateTime> createdAt = const Value.absent(),
+          }) =>
+              JournalsCompanion.insert(
+            id: id,
+            title: title,
+            photoIds: photoIds,
+            posterPath: posterPath,
+            createdAt: createdAt,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$JournalsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $JournalsTable,
+    Journal,
+    $$JournalsTableFilterComposer,
+    $$JournalsTableOrderingComposer,
+    $$JournalsTableAnnotationComposer,
+    $$JournalsTableCreateCompanionBuilder,
+    $$JournalsTableUpdateCompanionBuilder,
+    (Journal, BaseReferences<_$AppDatabase, $JournalsTable, Journal>),
+    Journal,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -1621,4 +2091,6 @@ class $AppDatabaseManager {
       $$SessionLogsTableTableManager(_db, _db.sessionLogs);
   $$PhotoActionsTableTableManager get photoActions =>
       $$PhotoActionsTableTableManager(_db, _db.photoActions);
+  $$JournalsTableTableManager get journals =>
+      $$JournalsTableTableManager(_db, _db.journals);
 }

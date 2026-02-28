@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'blitz_page.dart';
+import 'package:cozy_clean/features/blitz/presentation/pages/blitz_page.dart';
 import '../controllers/user_stats_controller.dart';
 import '../../core/utils/format_utils.dart';
 
 import 'profile_page.dart';
+import 'package:cozy_clean/features/journal/presentation/pages/journal_page.dart';
 
 class DashboardPage extends ConsumerStatefulWidget {
   const DashboardPage({super.key});
@@ -26,6 +27,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         index: _currentIndex,
         children: [
           _buildDashboardContent(),
+          const JournalPage(),
           const ProfilePage(),
         ],
       ),
@@ -547,7 +549,12 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           BottomNavigationBarItem(
             icon: Icon(Icons.home_outlined),
             activeIcon: Icon(Icons.home_filled),
-            label: '整理',
+            label: '首页',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.auto_stories_outlined),
+            activeIcon: Icon(Icons.auto_stories),
+            label: '手账',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),

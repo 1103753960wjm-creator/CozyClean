@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:confetti/confetti.dart';
 import 'package:photo_manager/photo_manager.dart';
-import '../controllers/blitz_controller.dart';
+import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
+import 'package:cozy_clean/features/blitz/application/controllers/blitz_controller.dart';
+import 'package:cozy_clean/features/journal/presentation/pages/poster_page.dart';
 import '../controllers/user_stats_controller.dart';
 
 /// 总结算动画页面 (Summary Page)
@@ -15,12 +17,16 @@ import '../controllers/user_stats_controller.dart';
 class SummaryPage extends ConsumerStatefulWidget {
   final List<AssetEntity> deleteSet;
 
-  /// 本次会话中用户审阅的照片总数（用于全员珍藏流展示）
+  /// 本次会话中用户收藏的照片（上滑收藏，最多 6 张）
+  final List<AssetEntity> favoriteSet;
+
+  /// 本次会话中用户审阅的照片总数
   final int totalReviewedCount;
 
   const SummaryPage({
     super.key,
     required this.deleteSet,
+    this.favoriteSet = const [],
     this.totalReviewedCount = 0,
   });
 
@@ -85,10 +91,13 @@ class _SummaryPageState extends ConsumerState<SummaryPage>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final currentState = ref.read(blitzControllerProvider);
         ref.read(userStatsControllerProvider).commitBlitzSession(
-              keeps: currentState.sessionKeeps,
-              deletes: const {},
-              savedBytes: 0,
-            );
+          keeps: {
+            ...currentState.sessionKept.map((p) => p.id),
+            ...currentState.sessionFavorites.map((p) => p.id),
+          },
+          deletes: const {},
+          savedBytes: 0,
+        );
         ref.read(blitzControllerProvider.notifier).clearSessionDraft();
 
         _confettiController.play();
@@ -234,8 +243,11 @@ class _SummaryPageState extends ConsumerState<SummaryPage>
 
         final currentState = ref.read(blitzControllerProvider);
         ref.read(userStatsControllerProvider).commitBlitzSession(
-            keeps: currentState.sessionKeeps,
-            deletes: currentState.sessionDeletes,
+            keeps: {
+              ...currentState.sessionKept.map((p) => p.id),
+              ...currentState.sessionFavorites.map((p) => p.id),
+            },
+            deletes: currentState.sessionDeleted.map((p) => p.id).toSet(),
             savedBytes: savedBytes);
         ref.read(blitzControllerProvider.notifier).clearSessionDraft();
       } else {
@@ -609,6 +621,10 @@ class _SummaryPageState extends ConsumerState<SummaryPage>
               ),
             ),
 
+          // 收藏照片堆叠展示 + 生成手账海报按钮
+          if (isSuccess && widget.favoriteSet.isNotEmpty)
+            _buildFavoritesSection(),
+
           const Spacer(flex: 3),
 
           // 底部胶囊按钮
@@ -653,138 +669,141 @@ class _SummaryPageState extends ConsumerState<SummaryPage>
     final int reviewedCount = widget.totalReviewedCount;
 
     return SafeArea(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Spacer(flex: 2),
-
-          // 🌸 大 Emoji
-          const Text(
-            '🌸',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 72),
-          ),
-          const SizedBox(height: 16),
-
-          // 大标题
-          const Text(
-            '全员珍藏',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF4A6B48),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(vertical: 40),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 🌸 大 Emoji
+            const Text(
+              '🌸',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 72),
             ),
-          ),
-          const SizedBox(height: 8),
+            const SizedBox(height: 16),
 
-          // 副标题 — 手写体风格
-          const Text(
-            '所有照片都是宝贵的回忆呢',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 15,
-              fontStyle: FontStyle.italic,
-              color: Color(0xFF8BA888),
-              letterSpacing: 1.5,
-            ),
-          ),
-
-          const SizedBox(height: 48),
-
-          // 统计卡片
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40),
-            child: Container(
-              padding: const EdgeInsets.all(30),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFD4AF37).withOpacity(0.15),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  // 巨大数字
-                  TweenAnimationBuilder<double>(
-                    tween:
-                        Tween<double>(begin: 0, end: reviewedCount.toDouble()),
-                    duration: const Duration(seconds: 2),
-                    curve: Curves.easeOutCubic,
-                    builder: (context, value, child) {
-                      return Text(
-                        '${value.toInt()}',
-                        style: const TextStyle(
-                          fontSize: 56,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFFD4AF37), // 金色数字
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    '个美好瞬间已悉数珍藏',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontStyle: FontStyle.italic,
-                      color: Color(0xFF6B453E),
-                      letterSpacing: 1,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const Spacer(flex: 2),
-
-          // 底部提示语
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 40),
-            child: Text(
-              '今天没有需要告别的废片，全都是宝贵的记忆呢。',
+            // 大标题
+            const Text(
+              '全员珍藏',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 13,
-                color: Colors.black38,
-                letterSpacing: 0.5,
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF4A6B48),
               ),
             ),
-          ),
+            const SizedBox(height: 8),
 
-          const Spacer(flex: 1),
+            // 副标题
+            const Text(
+              '所有照片都是宝贵的回忆呢',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 15,
+                fontStyle: FontStyle.italic,
+                color: Color(0xFF8BA888),
+                letterSpacing: 1.5,
+              ),
+            ),
 
-          // 底部胶囊按钮
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).popUntil((route) => route.isFirst);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF8BA888),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                elevation: 4,
-                shadowColor: const Color(0xFF8BA888).withOpacity(0.4),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30),
+            const SizedBox(height: 48),
+
+            // 统计卡片
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Container(
+                padding: const EdgeInsets.all(30),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFD4AF37).withOpacity(0.15),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    // 巨大数字
+                    TweenAnimationBuilder<double>(
+                      tween: Tween<double>(
+                          begin: 0, end: reviewedCount.toDouble()),
+                      duration: const Duration(seconds: 2),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, child) {
+                        return Text(
+                          '${value.toInt()}',
+                          style: const TextStyle(
+                            fontSize: 56,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFFD4AF37),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      '个美好瞬间已悉数珍藏',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontStyle: FontStyle.italic,
+                        color: Color(0xFF6B453E),
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              child: const Text(
-                '回到首页',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+
+            // 收藏照片堆叠展示（全员珍藏流也显示）
+            if (widget.favoriteSet.isNotEmpty) _buildFavoritesSection(),
+
+            const SizedBox(height: 32),
+
+            // 底部提示语
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 40),
+              child: Text(
+                '今天没有需要告别的废片，全都是宝贵的记忆呢。',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.black38,
+                  letterSpacing: 0.5,
+                ),
               ),
             ),
-          ),
-        ],
+
+            const SizedBox(height: 24),
+
+            // 底部胶囊按钮
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF8BA888),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  elevation: 4,
+                  shadowColor: const Color(0xFF8BA888).withOpacity(0.4),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+                child: const Text(
+                  '回到首页',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -845,6 +864,128 @@ class _SummaryPageState extends ConsumerState<SummaryPage>
           },
         ),
       ],
+    );
+  }
+
+  /// 收藏照片堆叠展示 + "生成手账海报"按钮
+  ///
+  /// 将上滑收藏的照片以拍立得风格堆叠显示，
+  /// 并附带金色"生成手账海报"按钮引导用户进入海报编辑页。
+  Widget _buildFavoritesSection() {
+    final favorites = widget.favoriteSet;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+      child: Column(
+        children: [
+          // 分割线
+          const Divider(color: Color(0xFFE8E0D4), thickness: 1),
+          const SizedBox(height: 12),
+
+          // 标题
+          const Text(
+            '✨ 收藏的瞬间',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF4A4238),
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 堆叠照片
+          SizedBox(
+            height: 100,
+            child: Center(
+              child: SizedBox(
+                width: favorites.length * 30.0 + 60,
+                height: 100,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: List.generate(favorites.length, (index) {
+                    final photo = favorites[index];
+                    // 交替旋转角度，制造堆叠感
+                    final angle = (index - favorites.length / 2) * 0.08;
+                    final offsetX = index * 30.0;
+
+                    return Positioned(
+                      left: offsetX,
+                      child: Transform.rotate(
+                        angle: angle,
+                        child: Container(
+                          width: 64,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(3),
+                            border: Border.all(
+                              color: Colors.white,
+                              width: 3,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.15),
+                                blurRadius: 6,
+                                offset: const Offset(2, 3),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(1),
+                            child: AssetEntityImage(
+                              photo,
+                              isOriginal: false,
+                              thumbnailSize: const ThumbnailSize(200, 200),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: const Color(0xFFF0EBE2),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // "生成手账海报"按钮
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => PosterPage(photos: favorites),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.auto_stories_rounded, size: 18),
+              label: const Text(
+                '生成手账海报',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD4AF37),
+                foregroundColor: Colors.white,
+                elevation: 2,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

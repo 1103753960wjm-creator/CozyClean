@@ -4,6 +4,19 @@
 
 ---
 
+## v0.3.1 — 2026-02-28
+
+### ✨ 新特性与手账日记 (Journal) 模块
+- **闪电战上滑收藏** — 在 Blitz 模式中加入了“上滑收藏”手势，被收藏的照片可单独传递到结算页 (Summary UI 中作为 `favoriteSet` 接收)。
+- **专属清理海报分享** — 新增了 `PosterPage`，用户可以根据每次清理生成专属精美成就海报，集成了 `share_plus` 一键分享。
+- **手账模块入驻** — 新增 `features/journal` 领域模块，为接下来回顾珍藏的照片奠定基础 (`journal_page.dart`)。
+- **底层支持更新** — 扩展了 Drift `app_database`，支持新的照片及交互记录。
+
+### 📦 依赖更新
+- 更新 `pubspec.yaml`，引入了 `share_plus` 和 `intl` 工具包。
+
+---
+
 ## v0.3.0 — 2026-02-27
 
 ### ✨ 架构升级与连拍分组 (Burst Grouping)

@@ -35,6 +35,10 @@ dependencies:
   confetti: ^0.7.0
   photo_manager_image_provider: ^2.2.0
 
+  # 分享与格式化
+  share_plus: ^10.1.4
+  intl: ^0.19.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
