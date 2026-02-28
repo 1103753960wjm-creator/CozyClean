@@ -18,11 +18,15 @@ class PhotoCard extends StatelessWidget {
   /// 该卡片在数据流中的绝对索引
   final int index;
 
+  /// 格式化后的照片日期（如 "2023.05.20"），用于右下角展示
+  final String? dateString;
+
   const PhotoCard({
     super.key,
     required this.imageData,
     this.swiperController,
     required this.index,
+    this.dateString,
   });
 
   @override
@@ -53,17 +57,58 @@ class PhotoCard extends StatelessWidget {
         children: [
           // 上半部分：照片本身 (拉大白底 padding，让相纸白框有更明显的"护城河"承载感)
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(
-                  left: 14, right: 14, top: 14, bottom: 2),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  _buildImageLayer(),
-                  // 印章层
-                  if (swiperController != null) _buildStampLayer(),
-                ],
-              ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Positioned.fill(
+                  child: Padding(
+                    padding: const EdgeInsets.only(
+                        left: 14, right: 14, top: 14, bottom: 2),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        _buildImageLayer(),
+                        // 印章层
+                        if (swiperController != null) _buildStampLayer(),
+                      ],
+                    ),
+                  ),
+                ),
+                // 顶部胶带贴纸
+                Positioned(
+                  top: -6,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Transform.rotate(
+                      angle: -0.02,
+                      child: Container(
+                        width: 110,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFE8D6).withOpacity(0.95),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                          // 模拟胶带边缘纹理的横纹
+                          border: Border.all(
+                            color: Colors.black.withOpacity(0.03),
+                            width: 1,
+                          ),
+                        ),
+                        // 可以加一条细细的纹理线
+                        child: CustomPaint(
+                          painter: _TapePainter(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           // 下半部分：留白区域及手写风配文
@@ -95,10 +140,37 @@ class PhotoCard extends StatelessWidget {
       decoration: BoxDecoration(
         border: Border.all(color: Colors.black.withOpacity(0.05), width: 1),
       ),
-      child: Image.memory(
-        imageData!,
-        fit: BoxFit.cover,
-        gaplessPlayback: true,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.memory(
+            imageData!,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+          ),
+          if (dateString != null && dateString!.isNotEmpty)
+            Positioned(
+              right: 8,
+              bottom: 8,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.45),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  dateString!,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -162,7 +234,6 @@ class PhotoCard extends StatelessWidget {
     );
   }
 
-  /// 构建出错时的占位符
   Widget _buildErrorPlaceholder() {
     return Container(
       color: const Color(0xFFF0EBE2),
@@ -171,4 +242,22 @@ class PhotoCard extends StatelessWidget {
           size: 48, color: Colors.black26),
     );
   }
+}
+
+/// 绘制极细的横向胶带纹理
+class _TapePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.03) // 极浅的纹理颜色
+      ..strokeWidth = 0.5;
+
+    // 在随机间距画几条横线模拟纹路
+    for (double y = 4; y < size.height - 4; y += 3.5) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

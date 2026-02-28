@@ -22,6 +22,7 @@ import 'package:photo_manager/photo_manager.dart';
 import 'package:cozy_clean/features/blitz/application/state/blitz_state.dart';
 import 'package:cozy_clean/features/blitz/data/providers/blitz_data_providers.dart';
 import 'package:cozy_clean/features/blitz/domain/models/photo_group.dart';
+import 'package:cozy_clean/features/blitz/domain/repositories/onboarding_repository.dart';
 import 'package:cozy_clean/features/blitz/domain/services/burst_grouping_service.dart';
 import 'package:cozy_clean/presentation/controllers/user_stats_controller.dart';
 
@@ -91,6 +92,8 @@ class BlitzController extends Notifier<BlitzState> {
   BlitzRepository get _repository => ref.read(blitzRepositoryProvider);
   BurstGroupingService get _burstService =>
       ref.read(burstGroupingServiceProvider);
+  OnboardingRepository get _onboardingRepository =>
+      ref.read(onboardingRepositoryProvider);
 
   // ============================================================
   // 初始化与照片加载
@@ -159,6 +162,35 @@ class BlitzController extends Notifier<BlitzState> {
     } finally {
       _loadingInProgress = false;
     }
+  }
+
+  // ============================================================
+  // 新手引导状态控制
+  // ============================================================
+
+  /// 读取底层偏好设置，决定是否显示引导蒙版
+  void loadOnboardingStatus() {
+    try {
+      final hasSeen = _onboardingRepository.hasSeenBlitzOnboarding();
+      state = state.copyWith(
+        showOnboarding: !hasSeen,
+        onboardingLoaded: true,
+      );
+    } catch (e) {
+      // SharedPreferences 可能在热重载后未正确注入，
+      // 此时降级为不显示引导，避免阻塞整个页面。
+      debugPrint('[BlitzController] ⚠️ 引导状态加载失败: $e');
+      state = state.copyWith(
+        showOnboarding: false,
+        onboardingLoaded: true,
+      );
+    }
+  }
+
+  /// 关闭新手引导并异步写底层存储
+  Future<void> dismissOnboarding() async {
+    state = state.copyWith(showOnboarding: false);
+    await _onboardingRepository.setSeenBlitzOnboarding();
   }
 
   // ============================================================

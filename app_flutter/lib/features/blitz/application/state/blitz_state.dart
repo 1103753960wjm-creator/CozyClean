@@ -126,6 +126,14 @@ class BlitzState {
   /// 当 pendingReviewIndex >= sessionPending.length 时表示回放完毕。
   final int pendingReviewIndex;
 
+  /// 是否显示新手引导蒙版
+  ///
+  /// 初始值为 false，待加载本地状态后再决定是否展示。
+  final bool showOnboarding;
+
+  /// 新手引导状态是否已从持久化存储加载完成
+  final bool onboardingLoaded;
+
   const BlitzState({
     this.photoGroups = const [],
     this.currentGroupIndex = 0,
@@ -141,6 +149,8 @@ class BlitzState {
     this.lastSwipeDirection,
     this.isReviewingPending = false,
     this.pendingReviewIndex = 0,
+    this.showOnboarding = false,
+    this.onboardingLoaded = false,
   });
 
   // ============================================================
@@ -228,6 +238,8 @@ class BlitzState {
     int? Function()? lastSwipeDirection,
     bool? isReviewingPending,
     int? pendingReviewIndex,
+    bool? showOnboarding,
+    bool? onboardingLoaded,
   }) {
     return BlitzState(
       photoGroups: photoGroups != null
@@ -259,6 +271,8 @@ class BlitzState {
           : this.lastSwipeDirection,
       isReviewingPending: isReviewingPending ?? this.isReviewingPending,
       pendingReviewIndex: pendingReviewIndex ?? this.pendingReviewIndex,
+      showOnboarding: showOnboarding ?? this.showOnboarding,
+      onboardingLoaded: onboardingLoaded ?? this.onboardingLoaded,
     );
   }
 

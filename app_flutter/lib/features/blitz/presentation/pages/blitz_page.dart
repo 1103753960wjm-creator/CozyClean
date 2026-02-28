@@ -42,7 +42,6 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
   final AppinioSwiperController _pendingSwiperController =
       AppinioSwiperController();
   bool _isNavigating = false;
-  bool _isUndoAnimating = false;
 
   // ============================================================
   // 生命周期
@@ -52,6 +51,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(blitzControllerProvider.notifier).loadOnboardingStatus();
       ref.read(blitzControllerProvider.notifier).loadPhotos();
     });
   }
@@ -66,15 +66,6 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
   // ============================================================
   // 交互方法（仅调用 Controller）
   // ============================================================
-
-  void _triggerUndoAnimation() {
-    if (!mounted) return;
-    setState(() => _isUndoAnimating = true);
-    Future<void>.delayed(const Duration(milliseconds: 450), () {
-      if (!mounted) return;
-      setState(() => _isUndoAnimating = false);
-    });
-  }
 
   void _requestUndo() {
     final success = ref.read(blitzControllerProvider.notifier).undoLastSwipe();
@@ -93,7 +84,6 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
     }
     _swiperController.unswipe();
     HapticFeedback.mediumImpact();
-    _triggerUndoAnimation();
   }
 
   void _navigateToSummary(BlitzState blitzState) {
@@ -176,15 +166,16 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
   Widget build(BuildContext context) {
     final blitzState = ref.watch(blitzControllerProvider);
 
+    if (!blitzState.onboardingLoaded) {
+      return const SizedBox.shrink();
+    }
+
     // 监听全部处理完毕 → 检查是否需要进入待定区回放
     ref.listen(blitzControllerProvider, (previous, next) {
       if (!next.isLoading &&
           next.photoGroups.isNotEmpty &&
           !next.hasNextGroup &&
           !next.isReviewingPending) {
-        // 主照片全部处理完毕：
-        // 1) 有待定且尚未回放完 -> 进入回放
-        // 2) 无待定 -> 直接结算
         if (next.hasPendingPhotos && !next.isPendingReviewFinished) {
           ref.read(blitzControllerProvider.notifier).enterPendingReview();
         } else if (!next.hasPendingPhotos) {
@@ -192,7 +183,6 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
         }
       }
 
-      // 回放阶段完毕检测
       if (next.isReviewingPending && next.isPendingReviewFinished) {
         ref.read(blitzControllerProvider.notifier).finishPendingReview();
         _navigateToSummary(next);
@@ -242,16 +232,6 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
               child: Stack(
                 children: [
                   _buildPendingReviewSwiper(blitzState),
-                  // 收藏计数标记（右上角）
-                  if (blitzState.favoritesCount > 0)
-                    Positioned(
-                      top: 8,
-                      right: 30,
-                      child: _buildCountBadge(
-                        '❤️ ${blitzState.favoritesCount}/${BlitzState.maxFavorites}',
-                        const Color(0xFFE91E63),
-                      ),
-                    ),
                 ],
               ),
             ),
@@ -263,36 +243,33 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
 
     return _buildScaffold(
       context,
-      Column(
+      Stack(
         children: [
-          _buildTopBar(
-            context,
-            blitzState.currentGroupIndex < blitzState.photoGroups.length
-                ? blitzState.currentGroupIndex
-                : blitzState.photoGroups.length - 1,
-            blitzState.photoGroups.length,
-            blitzState.currentEnergy,
+          Column(
+            children: [
+              _buildTopBar(
+                context,
+                blitzState.photoGroups.isEmpty
+                    ? 0
+                    : (blitzState.currentGroupIndex <
+                            blitzState.photoGroups.length
+                        ? blitzState.currentGroupIndex
+                        : blitzState.photoGroups.length - 1),
+                blitzState.photoGroups.length,
+                blitzState.favoritesCount,
+              ),
+              Expanded(
+                child: Stack(
+                  children: [
+                    _buildSwiperContainer(blitzState),
+                  ],
+                ),
+              ),
+              _buildActionButtons(blitzState),
+              const SizedBox(height: 20), // 增加底部操作按钮与屏幕下方的留白间距
+            ],
           ),
-          Expanded(
-            child: Stack(
-              children: [
-                _buildSwiperContainer(blitzState),
-                // 收藏计数标记（右上角）
-                if (blitzState.favoritesCount > 0)
-                  Positioned(
-                    top: 8,
-                    right: 30,
-                    child: _buildCountBadge(
-                      '❤️ ${blitzState.favoritesCount}/${BlitzState.maxFavorites}',
-                      const Color(0xFFE91E63),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          _buildActionButtons(blitzState),
-          // 底部待定区
-          if (blitzState.pendingCount > 0) _buildPendingBar(blitzState),
+          if (blitzState.showOnboarding) _buildOnboardingOverlay(context),
         ],
       ),
     );
@@ -302,53 +279,93 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
   // UI 组件构建
   // ============================================================
 
-  /// 计数 Badge 组件
-  Widget _buildCountBadge(String text, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: color,
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-
-  /// 底部待定区浮窗
-  Widget _buildPendingBar(BlitzState blitzState) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8, left: 24, right: 24),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F0E8),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: const Color(0xFFE5DFD3),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.schedule_rounded, color: Colors.black38, size: 16),
-          const SizedBox(width: 6),
-          Text(
-            '待定区 · ${blitzState.pendingCount} 张',
-            style: const TextStyle(
-              color: Colors.black54,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
+  /// 引导蒙版页
+  Widget _buildOnboardingOverlay(BuildContext context) {
+    return Positioned.fill(
+      child: GestureDetector(
+        onTap: () {
+          ref.read(blitzControllerProvider.notifier).dismissOnboarding();
+        },
+        child: Container(
+          color: Colors.black.withValues(alpha: 0.65), // 半透明遮罩
+          child: SafeArea(
+            child: Stack(
+              children: [
+                // 上方指示
+                const Align(
+                  alignment: Alignment.topCenter,
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 140),
+                    child: Text(
+                      '↑ 上滑高光',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+                // 下方指示
+                const Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: 240),
+                    child: Text(
+                      '↓ 下滑待定',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+                // 左侧指示
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: EdgeInsets.only(left: 24, bottom: 40),
+                    child: Text(
+                      '← 左滑删除',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+                // 右侧指示
+                const Align(
+                  alignment: Alignment.centerRight,
+                  child: Padding(
+                    padding: EdgeInsets.only(right: 24, bottom: 40),
+                    child: Text(
+                      '右滑珍藏 →',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+                // 底部边界提示：轻触任意位置继续
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 120),
+                    child: Text(
+                      '— 轻触任意位置继续 —',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        fontSize: 14,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -483,49 +500,87 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
 
   /// 顶部信息栏
   Widget _buildTopBar(
-      BuildContext context, int currentIndex, int total, double energy) {
-    final bool isPro = energy == double.infinity;
-
+      BuildContext context, int currentIndex, int total, int favoritesCount) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          GestureDetector(
-            onTap: () {
-              final state = ref.read(blitzControllerProvider);
-              if (state.sessionDeleted.isEmpty) {
-                Navigator.maybePop(context);
-              } else {
-                _showExitConfirmationBottomSheet();
-              }
-            },
-            child: const Text('返回',
-                style: TextStyle(
-                    color: Colors.black45,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500)),
-          ),
-          Text(
-            '${currentIndex + 1} / $total',
-            style: const TextStyle(
-              color: Colors.black54,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
+          // 左侧：圆形返回按键
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back_rounded,
+                  color: Color(0xFF6B6560), size: 24),
+              onPressed: () {
+                final state = ref.read(blitzControllerProvider);
+                if (state.sessionDeleted.isEmpty) {
+                  Navigator.maybePop(context);
+                } else {
+                  _showExitConfirmationBottomSheet();
+                }
+              },
             ),
           ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
+          // 右侧：进度和收藏
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              const Icon(Icons.bolt_rounded,
-                  color: Color(0xFFD4AF37), size: 20),
-              const SizedBox(width: 4),
-              Text(
-                isPro ? '∞' : '${energy.toInt()}',
-                style: const TextStyle(
-                  color: Color(0xFF4A4238),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+              RichText(
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: '${currentIndex + 1}',
+                      style: const TextStyle(
+                        color: Color(0xFF4A4238),
+                        fontSize: 26,
+                        fontFamily: 'Georgia', // 衬线体
+                        fontStyle: FontStyle.italic,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    TextSpan(
+                      text: ' / $total',
+                      style: const TextStyle(
+                        color: Color(0xFF8C867E),
+                        fontSize: 16,
+                        fontFamily: 'Georgia',
+                        fontStyle: FontStyle.italic,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 2),
+              RichText(
+                text: TextSpan(
+                  children: [
+                    const WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: Icon(Icons.star_rounded,
+                          color: Color(0xFFF7D154), size: 14),
+                    ),
+                    TextSpan(
+                      text:
+                          ' ${favoritesCount == 0 ? "0" : favoritesCount}/${BlitzState.maxFavorites}',
+                      style: const TextStyle(
+                        color: Color(0xFFF7D154),
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -606,232 +661,135 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
     );
   }
 
-  /// 四方向操作按钮
-  ///
-  /// 布局：
-  ///   上方中央 = 收藏 ❤️
-  ///   左侧 = 删除，右侧 = 保留
-  ///   下方中央 = 跳过
-  ///   左下方 = 撤销
+  /// 底部操作区 (5个圆形按钮)
   Widget _buildActionButtons(BlitzState blitzState) {
-    return SizedBox(
-      height: 140,
-      width: double.infinity,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.center,
+    return Padding(
+      padding: const EdgeInsets.only(
+          bottom: 12, left: 24, right: 24), // 缩小底边距，因为外设 Spacer
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // 上方：收藏按钮
-              GestureDetector(
-                onTap: () {
-                  if (blitzState.isReviewingPending) {
-                    final success = ref
-                        .read(blitzControllerProvider.notifier)
-                        .reviewPendingUp();
-                    if (!success) _showFavoritesFullWarning();
-                  } else {
-                    _swiperController.swipeUp();
-                  }
-                },
-                child: Container(
-                  color: Colors.transparent,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.favorite_rounded,
-                          color: blitzState.isFavoritesFull
-                              ? Colors.black26
-                              : const Color(0xFFE91E63),
-                          size: 16),
-                      const SizedBox(width: 4),
-                      Text(
-                        '收藏',
-                        style: TextStyle(
-                          color: blitzState.isFavoritesFull
-                              ? Colors.black26
-                              : const Color(0xFFE91E63).withValues(alpha: 0.8),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 4),
-              // 中间行：删除 + 保留
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      if (blitzState.isReviewingPending) {
-                        ref
-                            .read(blitzControllerProvider.notifier)
-                            .reviewPendingLeft();
-                      } else {
-                        _swiperController.swipeLeft();
-                      }
-                    },
-                    child: Container(
-                      color: Colors.transparent,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 30, vertical: 14),
-                      child: Text(
-                        '删除',
-                        style: TextStyle(
-                          color: Colors.red[300]!.withValues(alpha: 0.8),
-                          fontSize: 18,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 2,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 40),
-                  GestureDetector(
-                    onTap: () {
-                      if (blitzState.isReviewingPending) {
-                        ref
-                            .read(blitzControllerProvider.notifier)
-                            .reviewPendingRight();
-                      } else {
-                        _swiperController.swipeRight();
-                      }
-                    },
-                    child: Container(
-                      color: Colors.transparent,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 30, vertical: 14),
-                      child: Text(
-                        '保留',
-                        style: TextStyle(
-                          color: const Color(0xFF8BA888).withValues(alpha: 0.8),
-                          fontSize: 18,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 2,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              // 下方：跳过按钮
-              GestureDetector(
-                onTap: blitzState.isReviewingPending
-                    ? null // 回放阶段禁用跳过
-                    : () => _swiperController.swipeDown(),
-                child: Container(
-                  color: Colors.transparent,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.schedule_rounded,
-                          color: Colors.black38, size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        '跳过',
-                        style: TextStyle(
-                          color: Colors.black45.withValues(alpha: 0.7),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+          // 1. 撤销
+          _buildCircleButton(
+            icon: Icons.replay_rounded,
+            label: '撤销',
+            onTap: _requestUndo,
+            color: const Color(0xFF9E9E9E),
+            size: 50,
           ),
-          // 撤销按钮
-          Positioned(
-            left: 20,
-            bottom: 60,
-            child: GestureDetector(
-              onTap: _requestUndo,
-              child: Transform.rotate(
-                angle: -0.05,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF0EBE2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 4,
-                        offset: const Offset(2, 2),
-                      ),
-                    ],
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(2),
-                      bottomLeft: Radius.circular(8),
-                      topRight: Radius.circular(8),
-                      bottomRight: Radius.circular(2),
-                    ),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.replay_rounded,
-                          color: Colors.black45, size: 14),
-                      SizedBox(width: 4),
-                      Text(
-                        '撤销',
-                        style: TextStyle(
-                          color: Colors.black54,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+          // 2. 删除
+          _buildCircleButton(
+            icon: Icons.delete_outline_rounded, // 更细的删除标
+            label: '删除',
+            onTap: () {
+              if (blitzState.isReviewingPending) {
+                ref.read(blitzControllerProvider.notifier).reviewPendingLeft();
+              } else {
+                _swiperController.swipeLeft();
+              }
+            },
+            color: const Color(0xFF8C7A76),
+            size: 50,
           ),
-          // 撤销动效标签
-          Positioned(
-            left: 16,
-            bottom: 128,
-            child: AnimatedSlide(
-              duration: const Duration(milliseconds: 280),
-              offset: _isUndoAnimating ? Offset.zero : const Offset(0.28, 0),
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 240),
-                opacity: _isUndoAnimating ? 1 : 0,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.95),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Text(
-                    '↩ 照片飞回中',
-                    style: TextStyle(
-                      color: Color(0xFF8BA888),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ),
+          // 3. 稍后 (大粉圈)
+          _buildCircleButton(
+            icon: Icons.arrow_downward_rounded, // 箭头向下代替表盘
+            label: '稍后',
+            onTap: blitzState.isReviewingPending
+                ? null
+                : () => _swiperController.swipeDown(),
+            color: const Color(0xFFC79E9A), // 粉偏棕色
+            size: 70,
+            isOutlined: true,
+          ),
+          // 4. 高光
+          _buildCircleButton(
+            icon: Icons.star_border_rounded, // 细心的星星
+            label: '高光',
+            onTap: () {
+              if (blitzState.isReviewingPending) {
+                final success = ref
+                    .read(blitzControllerProvider.notifier)
+                    .reviewPendingUp();
+                if (!success) _showFavoritesFullWarning();
+              } else {
+                _swiperController.swipeUp();
+              }
+            },
+            color: const Color(0xFF8C7A76),
+            size: 50,
+          ),
+          // 5. 珍藏
+          _buildCircleButton(
+            icon: Icons.favorite_border_rounded, // 留空的爱心
+            label: '珍藏',
+            onTap: () {
+              if (blitzState.isReviewingPending) {
+                ref.read(blitzControllerProvider.notifier).reviewPendingRight();
+              } else {
+                _swiperController.swipeRight();
+              }
+            },
+            color: const Color(0xFF8C7A76),
+            size: 50,
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildCircleButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback? onTap,
+    required Color color,
+    required double size,
+    bool isOutlined = false,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              color: Colors.white, // 统一白底
+              shape: BoxShape.circle,
+              border: Border.all(
+                  color: isOutlined
+                      ? color.withValues(alpha: 0.5)
+                      : const Color(0xFFE5DFD3), // 普通色系给予极浅的描边
+                  width: isOutlined ? 2 : 1),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.08),
+                  blurRadius: 10,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: size * 0.45,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFF8C867E), // 字体统一灰褐
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1,
+          ),
+        ),
+      ],
     );
   }
 

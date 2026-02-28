@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cozy_clean/features/blitz/presentation/pages/blitz_page.dart';
 import '../controllers/user_stats_controller.dart';
-import '../../core/utils/format_utils.dart';
-
 import 'profile_page.dart';
 import 'package:cozy_clean/features/journal/presentation/pages/journal_page.dart';
 
@@ -21,7 +19,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   Widget build(BuildContext context) {
     // 基础骨架，手账风暖白底色
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF9F6),
+      backgroundColor: const Color(0xFFF5F1E5),
       bottomNavigationBar: _buildBottomNav(),
       body: IndexedStack(
         index: _currentIndex,
@@ -36,483 +34,609 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
 
   Widget _buildDashboardContent() {
     return SafeArea(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: ConstrainedBox(
-              // 确保最小高度充满全屏，超出时允许滚动
-              constraints: BoxConstraints(minHeight: constraints.maxHeight),
-              child: IntrinsicHeight(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Spacer(flex: 2),
-                    _buildHeader(ref),
-                    const Spacer(flex: 2),
-                    _buildDataRing(ref),
-                    const Spacer(flex: 1),
-                    _buildAchievementBanner(ref),
-                    const Spacer(flex: 1),
-                    _buildModeSelector(context),
-                    const Spacer(flex: 2),
-                    _buildStartButton(context),
-                    const Spacer(flex: 2),
-                    _buildEnergyBar(),
-                    const Spacer(flex: 2),
-                  ],
-                ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildHeader(ref),
+          Expanded(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                children: [
+                  const SizedBox(height: 24),
+                  _buildDataRing(ref),
+                  const SizedBox(height: 20),
+                  const Text(
+                    '整理照片，就像整理心情。\n今天也要轻松一下哦。',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF867C6A),
+                      height: 1.6,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  _buildModeSection(context),
+                  const SizedBox(height: 32),
+                ],
               ),
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }
 
-  /// 顶层欢迎与标题
   Widget _buildHeader(WidgetRef ref) {
-    final userStatsAsync = ref.watch(userStatsStreamProvider);
-    final isPro = userStatsAsync.value?.isPro ?? false;
-
-    return Column(
-      children: [
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () {
-            print(
-                '👉 [DashboardPage] Title tapped! Toggling Pro mode to: ${!isPro}');
-            ref.read(userStatsControllerProvider).togglePro(!isPro);
-          },
-          child: Padding(
-            padding:
-                const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-            child: Text(
-              '晚上好，林小舒${isPro ? ' (PRO)' : ''}',
-              style: const TextStyle(
-                fontSize: 21,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF4A4238), // 深咖啡文字色
-                letterSpacing: 1.5,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFD8B99E),
+                  shape: BoxShape.circle,
+                ),
+                child: const Center(
+                  child: Icon(Icons.person, color: Color(0xFF4A4238), size: 28),
+                ),
               ),
+              const SizedBox(width: 12),
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '早安,',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF867C6A),
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    '暖心妈妈',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF4A4238),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          GestureDetector(
+            onTap: () {
+              final isPro =
+                  ref.read(userStatsStreamProvider).value?.isPro ?? false;
+              ref.read(userStatsControllerProvider).togglePro(!isPro);
+            },
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.settings,
+                  color: Color(0xFF867C6A), size: 24),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDataRing(WidgetRef ref) {
+    final userStatsAsync = ref.watch(userStatsStreamProvider);
+    return Center(
+      child: SizedBox(
+        width: 190,
+        height: 190,
+        child: userStatsAsync.when(
+          data: (stats) {
+            final isPro = stats.isPro;
+            final double rawProgress = isPro
+                ? 1.0
+                : (stats.dailyEnergyRemaining / 100.0).clamp(0.0, 1.0);
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                const CircularProgressIndicator(
+                  value: 1.0,
+                  strokeWidth: 12,
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFEBE3D0)),
+                ),
+                Transform.flip(
+                  flipX: true,
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween<double>(begin: 0, end: rawProgress),
+                    duration: const Duration(milliseconds: 800),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, value, _) {
+                      return CircularProgressIndicator(
+                        value: value,
+                        strokeWidth: 12,
+                        backgroundColor: Colors.transparent,
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                            Color(0xFF865F43)),
+                      );
+                    },
+                  ),
+                ),
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 8),
+                    const Text(
+                      '今日能量',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF867C6A)),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          isPro ? '∞' : '${stats.dailyEnergyRemaining.toInt()}',
+                          style: const TextStyle(
+                            fontSize: 48,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF6B453E),
+                          ),
+                        ),
+                        if (!isPro)
+                          const Text(
+                            '/50',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFFA1978A),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEBE3D0),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.bolt,
+                              size: 14, color: Color(0xFF865F43)),
+                          const SizedBox(width: 4),
+                          Text(
+                            isPro ? '全站免费' : '能量充足',
+                            style: const TextStyle(
+                                fontSize: 10,
+                                color: Color(0xFF865F43),
+                                fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+          loading: () => const Center(
+              child: CircularProgressIndicator(color: Color(0xFF865F43))),
+          error: (_, __) => const SizedBox.shrink(),
         ),
-        const SizedBox(height: 6),
-        Text(
-          '准备好整理回忆了吗？',
-          style: TextStyle(
-            fontSize: 12,
-            color: const Color(0xFF4A4238).withOpacity(0.6),
-            letterSpacing: 1,
+      ),
+    );
+  }
+
+  Widget _buildModeSection(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                '选择清理模式',
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF4A4238)),
+              ),
+              GestureDetector(
+                onTap: () {
+                  _showAllModesModal(context);
+                },
+                child: const Row(
+                  children: [
+                    Text('全部 ',
+                        style:
+                            TextStyle(fontSize: 13, color: Color(0xFF867C6A))),
+                    Icon(Icons.arrow_forward_ios,
+                        size: 10, color: Color(0xFF867C6A)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 264,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            children: [
+              _buildBigModeCard(
+                context,
+                title: '⚡ 闪电模式',
+                subtitle: '快速清理相似照片，释放空间。',
+                imagePath: 'assets/images/mode_blitz_bg.png',
+                badge: 'FREE',
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const BlitzPage())),
+              ),
+              const SizedBox(width: 16),
+              _buildBigModeCard(
+                context,
+                title: '✂️ 截图粉碎机',
+                subtitle: '自动识别并清理过期截图。',
+                imagePath: 'assets/images/mode_shredder_bg.png',
+                badge: 'PRO',
+                isPro: true,
+                onTap: () => _showComingSoon(context),
+              ),
+              const SizedBox(width: 16),
+              _buildBigModeCard(
+                context,
+                title: '⌛ 时光旅行',
+                subtitle: '重温美好回忆，拾起遗忘角落。',
+                imagePath: 'assets/images/mode_time_machine_bg.png',
+                badge: 'PRO',
+                isPro: true,
+                onTap: () => _showComingSoon(context),
+              ),
+            ],
           ),
         ),
       ],
     );
   }
 
-  /// 核心数据环 - 接入 LocalUserStats 真实统计数
-  ///
-  /// 会员模式区分：
-  /// - 普通用户：显示数字体力值 + 绿色/红色动态进度环
-  /// - Pro 会员：显示 ∞ 无限符号 + 金色满圈环
-  Widget _buildDataRing(WidgetRef ref) {
-    // 监听数据库中的用户数据流
-    final userStatsAsync = ref.watch(userStatsStreamProvider);
-
-    return Center(
-      child: SizedBox(
-        width: 144,
-        height: 144,
-        child: userStatsAsync.when(
-          data: (stats) {
-            final bool isPro = stats.isPro;
-            final energy = stats.dailyEnergyRemaining;
-
-            // Pro 会员：满圈金色 | 普通用户：按比例计算
-            final double progress =
-                isPro ? 1.0 : (energy / 100.0).clamp(0.0, 1.0);
-
-            // Pro 会员：金色 | 普通 <10 体力：红色 | 普通 ≥10 体力：绿色
-            final Color progressColor = isPro
-                ? const Color(0xFFD4AF37) // 金色，体现尊贵会员感
-                : energy < 10
-                    ? const Color(0xFFD66B63) // 红色警示
-                    : const Color(0xFF8BA888); // 绿色正常
-
-            return Stack(
-              fit: StackFit.expand,
-              children: [
-                // 底部浅色灰色圆环 (底座轨道)
-                const CircularProgressIndicator(
-                  value: 1.0,
-                  strokeWidth: 4,
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE5DFD3)),
-                ),
-                // 动态进度圆环，通过水平翻转使其顺时针增长
-                Transform.flip(
-                  flipX: true,
-                  child: TweenAnimationBuilder<double>(
-                      tween: Tween<double>(begin: 0, end: progress),
-                      duration: const Duration(milliseconds: 800),
-                      curve: Curves.easeOutCubic,
-                      builder: (context, value, _) {
-                        return CircularProgressIndicator(
-                          value: value,
-                          strokeWidth: 4,
-                          backgroundColor: Colors.transparent,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(progressColor),
-                        );
-                      }),
-                ),
-                // 中心文字：Pro 显示 ∞，普通显示数字
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      isPro ? '∞' : '${energy.toInt()}',
-                      style: TextStyle(
-                        fontSize: isPro ? 48 : 38,
-                        fontWeight: FontWeight.w900,
-                        color: isPro
-                            ? const Color(0xFFD4AF37) // 金色数字
-                            : const Color(0xFF6B453E), // 绛棕色数字
-                      ),
-                    ),
-                    // Pro 会员隐藏 "/ 100" 副标题
-                    if (!isPro)
-                      Text(
-                        '/ 100',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: const Color(0xFF6B453E).withOpacity(0.5),
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-            );
-          },
-          loading: () => Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: const Color(0xFFE5DFD3),
-                width: 3,
-              ),
-            ),
-            child: const Center(
-              child: CircularProgressIndicator(color: Color(0xFFC75D56)),
-            ),
-          ),
-          error: (err, stack) => Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: const Color(0xFFE5DFD3),
-                width: 3,
-              ),
-            ),
-            child: Center(
-              child: Text(
-                'err',
-                style: TextStyle(color: Colors.red.withOpacity(0.5)),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// 功能选取器 (防溢出 ListView)
-  Widget _buildModeSelector(BuildContext context) {
-    return SizedBox(
-      height: 112, // 限定水平滚动的高度边界
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        children: [
-          _buildModeCard(
-            context,
-            icon: '⚡',
-            title: '闪电战',
-            badge: 'FREE',
-            isPrimary: true,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const BlitzPage()),
-              );
-            },
-          ),
-          const SizedBox(width: 15),
-          _buildModeCard(
-            context,
-            icon: '✂️',
-            title: '截图粉碎',
-            badge: 'PRO',
-            isPrimary: false,
-            onTap: () => _showComingSoon(context),
-          ),
-          const SizedBox(width: 15),
-          _buildModeCard(
-            context,
-            icon: '⌛',
-            title: '时光机',
-            badge: 'PRO',
-            isPrimary: false,
-            onTap: () => _showComingSoon(context),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 统一提取出来的功能卡片模块
-  Widget _buildModeCard(
+  Widget _buildBigModeCard(
     BuildContext context, {
-    required String icon,
     required String title,
+    required String subtitle,
+    required String imagePath,
     required String badge,
-    required bool isPrimary,
+    bool isPro = false,
     required VoidCallback onTap,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 88,
+        width: 191,
         decoration: BoxDecoration(
-          color: isPrimary ? const Color(0xFFFDFBF7) : Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color:
-                isPrimary ? const Color(0xFFC75D56) : const Color(0xFFE5DFD3),
-            width: isPrimary ? 1.5 : 1,
-            // 采用手账风，如果是次要卡片这里未来可以抽成自定义画笔画虚线，现在维持极简
-          ),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
+        clipBehavior: Clip.antiAlias,
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(icon, style: const TextStyle(fontSize: 26)),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isPrimary ? FontWeight.bold : FontWeight.w600,
-                color: const Color(0xFF4A4238),
+            Expanded(
+              flex: 5,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(imagePath, fit: BoxFit.cover),
+                  Positioned(
+                    top: 12,
+                    left: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isPro ? const Color(0xFFDCD2E7) : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        badge,
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: isPro
+                                ? const Color(0xFF6B453E)
+                                : const Color(0xFF865F43)),
+                      ),
+                    ),
+                  ),
+                  if (isPro)
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: const BoxDecoration(
+                            color: Color(0xFF865F43), shape: BoxShape.circle),
+                        child: const Icon(Icons.lock,
+                            size: 14, color: Colors.white),
+                      ),
+                    ),
+                ],
               ),
             ),
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: isPrimary ? Colors.transparent : Colors.black,
-                borderRadius: BorderRadius.circular(3),
-              ),
-              child: Text(
-                badge,
-                style: TextStyle(
-                  fontSize: 8,
-                  fontWeight: FontWeight.w900,
-                  // primary 则是其自身字的灰度色，如果是 pro 则是白字黑底标签
-                  color: isPrimary ? Colors.black38 : Colors.white,
-                  letterSpacing: 1,
+            Expanded(
+              flex: 3,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF6B453E)),
+                      maxLines: 1,
+                    ),
+                    const SizedBox(height: 4),
+                    Expanded(
+                      child: Text(
+                        subtitle,
+                        style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF867C6A),
+                            height: 1.3),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showAllModesModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return Container(
+          height: MediaQuery.of(ctx).size.height * 0.85,
+          decoration: const BoxDecoration(
+            color: Color(0xFFF5F1E5),
+            borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(24), topRight: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const SizedBox(width: 16),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(ctx),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: const BoxDecoration(
+                          color: Colors.white, shape: BoxShape.circle),
+                      child: const Icon(Icons.arrow_back,
+                          color: Color(0xFF6B453E), size: 20),
+                    ),
+                  ),
+                  const Expanded(
+                    child: Center(
+                      child: Text('全部模式',
+                          style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF4A4238))),
+                    ),
+                  ),
+                  const SizedBox(width: 48),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Expanded(
+                child: GridView.count(
+                  crossAxisCount: 2,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  mainAxisSpacing: 16,
+                  crossAxisSpacing: 16,
+                  childAspectRatio: 0.85,
+                  children: [
+                    _buildGridCard(ctx,
+                        title: '⚡ 闪电模式',
+                        subtitle: '快速清理相似照片',
+                        imagePath: 'assets/images/mode_blitz_bg.png',
+                        badge: 'FREE', onTap: () {
+                      Navigator.pop(ctx);
+                      Navigator.push(context,
+                          MaterialPageRoute(builder: (_) => const BlitzPage()));
+                    }),
+                    _buildGridCard(ctx,
+                        title: '✂️ 截图粉碎机',
+                        subtitle: '清理过期截图',
+                        imagePath: 'assets/images/mode_shredder_bg.png',
+                        badge: 'PRO',
+                        isPro: true,
+                        onTap: () => _showComingSoon(ctx)),
+                    _buildGridCard(ctx,
+                        title: '⌛ 时光旅行',
+                        subtitle: '重温美好回忆',
+                        imagePath: 'assets/images/mode_time_machine_bg.png',
+                        badge: 'PRO',
+                        isPro: true,
+                        onTap: () => _showComingSoon(ctx)),
+                    _buildComingSoonGridCard(),
+                  ],
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 40),
+                child: Text(
+                  '"每张照片都是时光的标本，\n值得被温柔对待。"',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF867C6A),
+                      fontStyle: FontStyle.italic),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildGridCard(BuildContext context,
+      {required String title,
+      required String subtitle,
+      required String imagePath,
+      required String badge,
+      bool isPro = false,
+      required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 4))
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: [
+            Expanded(
+              flex: 5,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(imagePath, fit: BoxFit.cover),
+                  Positioned(
+                    top: 10,
+                    left: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 3),
+                      decoration: BoxDecoration(
+                          color: isPro ? const Color(0xFFDCD2E7) : Colors.white,
+                          borderRadius: BorderRadius.circular(10)),
+                      child: Text(badge,
+                          style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: isPro
+                                  ? const Color(0xFF6B453E)
+                                  : const Color(0xFF865F43))),
+                    ),
+                  ),
+                  if (isPro)
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                            color: Color(0xFF865F43), shape: BoxShape.circle),
+                        child: const Icon(Icons.lock,
+                            size: 12, color: Colors.white),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Expanded(
+              flex: 3,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(title,
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF6B453E))),
+                  const SizedBox(height: 4),
+                  Text(subtitle,
+                      style: const TextStyle(
+                          fontSize: 10, color: Color(0xFF867C6A))),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildComingSoonGridCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+            color: const Color(0xFFEBE3D0),
+            width: 1.5,
+            style: BorderStyle.solid),
+      ),
+      child: const Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.add, size: 32, color: Color(0xFFD8B99E)),
+          SizedBox(height: 12),
+          Text('敬请期待',
+              style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF867C6A))),
+          SizedBox(height: 4),
+          Text('更多模式开发中',
+              style: TextStyle(fontSize: 10, color: Color(0xFFA1978A))),
+        ],
       ),
     );
   }
 
   void _showComingSoon(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('建设中，即将上线！🛠️', textAlign: TextAlign.center),
-        backgroundColor: const Color(0xFF8BA888),
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
-  }
-
-  /// 中央红色高光整理按钮
-  Widget _buildStartButton(BuildContext context) {
-    return Center(
-      child: GestureDetector(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const BlitzPage()),
-          );
-        },
-        child: Container(
-          width: 96,
-          height: 96,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: const RadialGradient(
-              colors: [
-                Color(0xFFD66B63), // 中心亮红
-                Color(0xFFB04343), // 边缘深红
-              ],
-              center: Alignment(-0.2, -0.2), // 光源左上
-              radius: 0.8,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFFB04343).withOpacity(0.5),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  '开始',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 2,
-                  ),
-                ),
-                Text(
-                  '整理',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.white70,
-                    letterSpacing: 1,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// 成就看板模块 — 展示累计清理空间
-  ///
-  /// 设计原则：
-  ///   - 有数据时：显示 “累计为手机释放了 x.x GB 空间”，给用户成就感
-  ///   - 零值/加载中：显示引导文案，鼓励用户开始整理
-  Widget _buildAchievementBanner(WidgetRef ref) {
-    final userStatsAsync = ref.watch(userStatsStreamProvider);
-    final totalBytes = userStatsAsync.value?.totalSavedBytes ?? 0;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [
-                Color(0xFFE8F5E9), // 浅绿起始
-                Color(0xFFC8E6C9), // 深绿结尾
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(20), // 增加圆角，更像胶囊
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF8BA888).withOpacity(0.15),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min, // 收缩包裹内容
-            children: [
-              // 左侧 Emoji 图标
-              const Text('🎉', style: TextStyle(fontSize: 22)),
-              const SizedBox(width: 8),
-              // 右侧文案
-              Flexible(
-                child: totalBytes > 0
-                    ? RichText(
-                        text: TextSpan(
-                          style: const TextStyle(
-                            fontSize: 12, // 缩小字号
-                            color: Color(0xFF4A4238),
-                            height: 1.4,
-                          ),
-                          children: [
-                            const TextSpan(text: '累计为手机释放了 '),
-                            TextSpan(
-                              text: FormatUtils.formatBytes(totalBytes),
-                              style: const TextStyle(
-                                fontSize: 16, // 数字稍大
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFF6B453E), // 绛棕色加粗数字
-                              ),
-                            ),
-                            const TextSpan(text: ' 空间'),
-                          ],
-                        ),
-                      )
-                    : const Text(
-                        '开始整理，成就从这里起步 ✨',
-                        style: TextStyle(
-                          fontSize: 12, // 缩小字号
-                          color: Color(0xFF6B453E),
-                          fontStyle: FontStyle.italic,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// 底部黄色条纹斜率进度条
-  Widget _buildEnergyBar() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
-      child: Column(
-        children: [
-          Container(
-            height: 16,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF3EAC2), // 明黄色系
-              borderRadius: BorderRadius.circular(4),
-              // 由于 Flutter 没有原生的斜纹背景，可以采用纯色或使用 CustomPaint，此处作极简处理为浅黄色实体
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            '今日体力',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.black26,
-            ),
-          )
-        ],
+      const SnackBar(
+        content: Text('建设中，即将上线！🛠️', textAlign: TextAlign.center),
+        backgroundColor: Color(0xFF865F43),
+        duration: Duration(seconds: 2),
       ),
     );
   }
