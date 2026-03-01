@@ -44,6 +44,12 @@ class BlitzState {
   /// 每个 [PhotoGroup] 可能包含 1 张独立照片或多张连拍照片。
   final List<PhotoGroup> photoGroups;
 
+  /// 分组前的原始照片总数
+  ///
+  /// 由 Repository 返回的扁平照片列表长度，用于 UI 显示真实照片数量。
+  /// 因为连拍分组会将多张照片合并为一组，所以 totalPhotoCount >= photoGroups.length。
+  final int totalPhotoCount;
+
   /// 当前正在展示的分组索引（从 0 开始）
   ///
   /// 每次用户完成一个分组的处理（四方向之一），索引 +1。
@@ -136,6 +142,7 @@ class BlitzState {
 
   const BlitzState({
     this.photoGroups = const [],
+    this.totalPhotoCount = 0,
     this.currentGroupIndex = 0,
     this.sessionDeleted = const [],
     this.sessionKept = const [],
@@ -192,6 +199,33 @@ class BlitzState {
   int get favoritesCount => sessionFavorites.length;
   int get pendingCount => sessionPending.length;
 
+  /// 已处理的照片累计数量（含当前组之前所有组的照片总和）
+  ///
+  /// 用于 UI 显示进度，例如 "第 5 张 / 共 50 张"。
+  /// 因为连拍组可能包含多张照片，所以此值 >= currentGroupIndex。
+  int get processedPhotoCount {
+    int count = 0;
+    final limit = currentGroupIndex < photoGroups.length
+        ? currentGroupIndex
+        : photoGroups.length;
+    for (int i = 0; i < limit; i++) {
+      count += photoGroups[i].count;
+    }
+    return count;
+  }
+
+  /// 当前组（含）之前的累计照片数，用于显示 "第 X 张"
+  int get currentPhotoNumber {
+    int count = 0;
+    final limit = currentGroupIndex < photoGroups.length
+        ? currentGroupIndex + 1
+        : photoGroups.length;
+    for (int i = 0; i < limit; i++) {
+      count += photoGroups[i].count;
+    }
+    return count;
+  }
+
   /// 是否存在待定照片
   bool get hasPendingPhotos => sessionPending.isNotEmpty;
 
@@ -225,6 +259,7 @@ class BlitzState {
   ///   使用 `Function()` 包装来区分 "不更新此字段" 和 "将此字段设为 null"。
   BlitzState copyWith({
     List<PhotoGroup>? photoGroups,
+    int? totalPhotoCount,
     int? currentGroupIndex,
     List<AssetEntity>? sessionDeleted,
     List<AssetEntity>? sessionKept,
@@ -245,6 +280,7 @@ class BlitzState {
       photoGroups: photoGroups != null
           ? List<PhotoGroup>.unmodifiable(photoGroups)
           : this.photoGroups,
+      totalPhotoCount: totalPhotoCount ?? this.totalPhotoCount,
       currentGroupIndex: currentGroupIndex ?? this.currentGroupIndex,
       sessionDeleted: sessionDeleted != null
           ? List<AssetEntity>.unmodifiable(sessionDeleted)

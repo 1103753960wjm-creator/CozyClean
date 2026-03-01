@@ -20,16 +20,21 @@ class JournalRepository {
   /// [title] 海报标题
   /// [photoAssetIds] 收藏照片的 Asset ID 列表
   /// [posterFilePath] 海报图片本地路径
+  /// [feeling] 用户此刻的感受文字（可选）
   Future<int> saveJournal({
     required String title,
     required List<String> photoAssetIds,
     required String posterFilePath,
+    String? feeling,
   }) async {
     return _db.into(_db.journals).insert(
           JournalsCompanion.insert(
             title: title,
             photoIds: jsonEncode(photoAssetIds),
             posterPath: posterFilePath,
+            feeling: feeling != null && feeling.isNotEmpty
+                ? Value(feeling)
+                : const Value.absent(),
           ),
         );
   }

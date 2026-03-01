@@ -4,6 +4,39 @@
 
 ---
 
+## v0.4.0 — 2026-03-01
+
+### ✨ 新特性与重要功能
+- **完整实现时光手账 (Journal) 模块**:
+  - `JournalPage`：核心日历视图界面，支持月份导航并结合底层记录进行标记。
+  - `JournalDetailPage`：详细记录并还原对应批次/清理动作下的图片集。
+  - `PosterPage`：支持海报模式聚合日记图文数据，供用户长截图与分享。
+- **底层架构深度重构 (Feature-First Architecture)**:
+  - 核心功能按领域 (Feature) 全面拆分目录包结构：
+    - 将原有散装控制转移至 `features/blitz/`（包含业务逻辑、状态、仓库与页面）。
+    - 新增 `features/journal/` 模块，包含专门针对时间线和归档相册的 UI 和 Repository。
+  - **数据库 (`app_database.dart`) 大幅升级**：增加了处理日志和手账历史相关 Table 定义。
+
+### 🐛 体验优化与 Bug 修复
+- **完善 `SummaryPage`**：适配最新的相册清理流和海报页接入。
+- **重构首页 (`DashboardPage`)**：增加时光手账专属操作卡片和快捷入口。
+- 整顿部分 `import` 路径错误及 Flutter 生成文件的同步配置。
+
+---
+
+## v0.3.2 — 2026-02-28
+
+### ✨ 新特性与架构改进
+- **引入项目架构规范文档** — 在 `.antigravity/` 下新增 `architecture.md`, `flutter_rules.md`, `storage_rules.md` 等开发规范，指导架构分层和命名。
+- **Dashboard 首页大改版** — 重新设计 `dashboard_page.dart`，新增网格化操作入口卡片 (包含“闪电战清理”、“相似/重复图片”、“超大视频”等分类)。
+- **静态资源配置** — 在 `pubspec.yaml` 中开放了 `assets/images/` 和 `assets/fonts/` 的静态文件支持。
+
+### 🐛 体验优化
+- **闪电战页面优化 (BlitzPage)** — 调整手势滑动逻辑与 UI 卡片嵌套边界，继续提升大批量照片连续清空时的渲染稳定度。
+- **状态管理调整** — 在 `blitz_controller` 与 `blitz_state` 中同步优化乐观状态变更的回调保护，防止数据错乱。
+
+---
+
 ## v0.3.1 — 2026-02-28
 
 ### ✨ 新特性与手账日记 (Journal) 模块

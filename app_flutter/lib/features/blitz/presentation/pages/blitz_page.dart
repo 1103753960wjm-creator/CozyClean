@@ -42,6 +42,13 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
   final AppinioSwiperController _pendingSwiperController =
       AppinioSwiperController();
   bool _isNavigating = false;
+  bool _isUndoAnimating = false;
+
+  /// 下滑飞入待定区动画状态
+  bool _showPendingFly = false;
+
+  /// 待定区计数器的 GlobalKey（用于定位飞入终点）
+  final GlobalKey _pendingCounterKey = GlobalKey();
 
   // ============================================================
   // 生命周期
@@ -95,7 +102,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
         builder: (context) => SummaryPage(
           deleteSet: blitzState.sessionDeleted,
           favoriteSet: blitzState.sessionFavorites,
-          totalReviewedCount: blitzState.photoGroups.length,
+          totalReviewedCount: blitzState.totalPhotoCount,
         ),
       ),
     );
@@ -140,6 +147,8 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
       case AxisDirection.down:
         HapticFeedback.selectionClick();
         notifier.swipeDown(photo);
+        // 触发待定区计数器弹跳动画
+        _triggerPendingFlyAnimation();
         break;
     }
   }
@@ -249,13 +258,8 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
             children: [
               _buildTopBar(
                 context,
-                blitzState.photoGroups.isEmpty
-                    ? 0
-                    : (blitzState.currentGroupIndex <
-                            blitzState.photoGroups.length
-                        ? blitzState.currentGroupIndex
-                        : blitzState.photoGroups.length - 1),
-                blitzState.photoGroups.length,
+                blitzState.currentPhotoNumber,
+                blitzState.totalPhotoCount,
                 blitzState.favoritesCount,
               ),
               Expanded(
@@ -266,7 +270,8 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                 ),
               ),
               _buildActionButtons(blitzState),
-              const SizedBox(height: 20), // 增加底部操作按钮与屏幕下方的留白间距
+              _buildPendingCounter(blitzState),
+              const SizedBox(height: 12),
             ],
           ),
           if (blitzState.showOnboarding) _buildOnboardingOverlay(context),
@@ -540,7 +545,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                 text: TextSpan(
                   children: [
                     TextSpan(
-                      text: '${currentIndex + 1}',
+                      text: '$currentIndex',
                       style: const TextStyle(
                         color: Color(0xFF4A4238),
                         fontSize: 26,
@@ -592,72 +597,118 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
 
   /// 空状态
   Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(28),
-              decoration: BoxDecoration(
-                color: const Color(0xFF8BA888).withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.task_alt_rounded,
-                size: 80,
-                color: Color(0xFF8BA888),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // 相册大图插画
+                  Image.asset(
+                    'assets/images/empty_album_illustration.png',
+                    width: 220,
+                    fit: BoxFit.contain,
+                  ),
+                  const SizedBox(height: 32),
+                  // 主标题
+                  const Text(
+                    '相册干干净净',
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF6F5643), // 深棕色
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // 副标题
+                  const Text(
+                    '今天没有需要告别的废片了，\n留下的全都是宝贵的记忆。',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF9E9689), // 浅灰褐色
+                      height: 1.8,
+                    ),
+                  ),
+                  const SizedBox(height: 48),
+                  // "去翻翻手账" 按钮
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF8A6549), // 棕色实体背景
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      minimumSize: const Size(double.infinity, 56),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(28),
+                      ),
+                    ),
+                    icon: const Icon(Icons.menu_book_rounded, size: 20),
+                    label: const Text(
+                      '去翻翻手账',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    onPressed: () {
+                      // 暂退回主界面，后续可引入路由跳至手账 Tab
+                      Navigator.maybePop(context);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  // "再整理一次" 按钮
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF8A6549), // 字与图标颜色
+                      side: const BorderSide(
+                          color: Color(0xFFD4CBBB), width: 1.5), // 边框
+                      backgroundColor: Colors.transparent,
+                      minimumSize: const Size(double.infinity, 56),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(28),
+                      ),
+                    ),
+                    icon: const Icon(Icons.refresh_rounded, size: 20),
+                    label: const Text(
+                      '再整理一次',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    onPressed: () {
+                      ref
+                          .read(blitzControllerProvider.notifier)
+                          .resetAllPhotoActions();
+                    },
+                  ),
+                  const SizedBox(height: 32),
+                  // "休息一下" 底部文字按钮
+                  GestureDetector(
+                    onTap: () => Navigator.maybePop(context),
+                    child: const Text(
+                      '休息一下',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFFB5A995),
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 32),
-            const Text(
-              '太棒了！',
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF4A4238),
-                letterSpacing: 2,
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              '相册里的废片已经全部清理完毕\n今天也是清爽的一天哦 ✨',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.black54,
-                height: 1.6,
-              ),
-            ),
-            const SizedBox(height: 50),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF8BA888),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                minimumSize: const Size(double.infinity, 56),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              onPressed: () {
-                ref
-                    .read(blitzControllerProvider.notifier)
-                    .resetAllPhotoActions();
-              },
-              child: const Text(
-                '重新整理一次',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -793,6 +844,93 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
     );
   }
 
+  /// 待定区计数器 — 按操作按钮下方显示
+  ///
+  /// 仅当 `pendingCount > 0` 且不在回放阶段时显示。
+  /// 使用 `AnimatedSwitcher` 实现数字跳动效果，
+  /// 以及 `AnimatedScale` 实现飞入时的弹跳反馈。
+  Widget _buildPendingCounter(BlitzState blitzState) {
+    final count = blitzState.pendingCount;
+    // 回放阶段或无待定照片时不显示
+    if (count == 0 || blitzState.isReviewingPending) {
+      return const SizedBox(height: 20);
+    }
+
+    return AnimatedScale(
+      scale: _showPendingFly ? 1.15 : 1.0,
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOutBack,
+      child: Padding(
+        key: _pendingCounterKey,
+        padding: const EdgeInsets.only(top: 8, bottom: 4),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFAF6F0), // 浅暖白
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: const Color(0xFFE0D8CC), // 暖灰边框
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.schedule_rounded,
+                size: 14,
+                color: Color(0xFFA89985),
+              ),
+              const SizedBox(width: 4),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                transitionBuilder: (child, animation) {
+                  return SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 0.5),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: FadeTransition(opacity: animation, child: child),
+                  );
+                },
+                child: Text(
+                  '$count张待定',
+                  key: ValueKey<int>(count),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF8A7D6D),
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 触发待定区计数器的弹跳反馈动画
+  ///
+  /// 下滑跳过时调用，让计数器短暂放大再恢复，
+  /// 配合触觉反馈提示用户照片已进入待定区。
+  void _triggerPendingFlyAnimation() {
+    if (!mounted) return;
+    setState(() => _showPendingFly = true);
+    Future<void>.delayed(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      setState(() => _showPendingFly = false);
+    });
+  }
+
   /// 体力耗尽警告
   void _showNoEnergyWarning() {
     showModalBottomSheet(
@@ -895,15 +1033,19 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
   }
 
   /// 待定区回放 Swiper — 三方向（禁用下滑）
+  ///
+  /// cardCount 使用 sessionPending.length（固定值），
+  /// 不随 pendingReviewIndex 变化，避免 Swiper 内部索引混乱。
+  /// 单张时使用 _SwipeablePendingCard 替代 AppinioSwiper。
   Widget _buildPendingReviewSwiper(BlitzState blitzState) {
     final pendingPhotos = blitzState.sessionPending;
-    final remaining = pendingPhotos.length - blitzState.pendingReviewIndex;
+    final total = pendingPhotos.length;
 
-    if (remaining <= 0) return const SizedBox.shrink();
+    if (total <= 0) return const SizedBox.shrink();
 
     // 单张时直接展示卡片 + 手势滑动，不使用 AppinioSwiper
-    if (remaining == 1) {
-      final photo = pendingPhotos[blitzState.pendingReviewIndex];
+    if (total == 1) {
+      final photo = pendingPhotos[0];
       return Center(
         child: AspectRatio(
           aspectRatio: 0.80,
@@ -922,8 +1064,9 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
           padding: const EdgeInsets.only(left: 30, right: 30, bottom: 10),
           child: AppinioSwiper(
             controller: _pendingSwiperController,
-            cardCount: remaining,
-            backgroundCardCount: remaining > 2 ? 2 : 1,
+            // cardCount 固定为总数，Swiper 内部管理滑动进度
+            cardCount: total,
+            backgroundCardCount: total > 2 ? 2 : 1,
             backgroundCardScale: 0.92,
             backgroundCardOffset: const Offset(0, 15),
             // 回放阶段禁用下滑（不能再跳过了）
@@ -941,11 +1084,10 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
               // 回放完毕由 ref.listen 检测 isPendingReviewFinished 处理
             },
             cardBuilder: (BuildContext context, int index) {
-              final actualIndex = blitzState.pendingReviewIndex + index;
-              if (actualIndex < 0 || actualIndex >= pendingPhotos.length) {
+              if (index < 0 || index >= pendingPhotos.length) {
                 return const SizedBox.shrink();
               }
-              final photo = pendingPhotos[actualIndex];
+              final photo = pendingPhotos[index];
               // 回放复用拍立得卡片，传入回放专用 controller 以正确显示印章
               return _buildPhotoCard(
                 photo,

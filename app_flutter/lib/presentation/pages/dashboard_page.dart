@@ -4,6 +4,7 @@ import 'package:cozy_clean/features/blitz/presentation/pages/blitz_page.dart';
 import '../controllers/user_stats_controller.dart';
 import 'profile_page.dart';
 import 'package:cozy_clean/features/journal/presentation/pages/journal_page.dart';
+import 'package:cozy_clean/features/journal/application/controllers/journal_controller.dart';
 
 class DashboardPage extends ConsumerStatefulWidget {
   const DashboardPage({super.key});
@@ -660,6 +661,10 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           setState(() {
             _currentIndex = index;
           });
+          // 切换到手账 tab 时刷新列表
+          if (index == 1) {
+            ref.read(journalControllerProvider.notifier).loadJournals();
+          }
         },
         elevation: 0,
         backgroundColor: Colors.transparent,

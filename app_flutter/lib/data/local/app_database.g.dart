@@ -1075,6 +1075,12 @@ class $JournalsTable extends Journals with TableInfo<$JournalsTable, Journal> {
   late final GeneratedColumn<String> posterPath = GeneratedColumn<String>(
       'poster_path', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _feelingMeta =
+      const VerificationMeta('feeling');
+  @override
+  late final GeneratedColumn<String> feeling = GeneratedColumn<String>(
+      'feeling', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _createdAtMeta =
       const VerificationMeta('createdAt');
   @override
@@ -1085,7 +1091,7 @@ class $JournalsTable extends Journals with TableInfo<$JournalsTable, Journal> {
       defaultValue: currentDateAndTime);
   @override
   List<GeneratedColumn> get $columns =>
-      [id, title, photoIds, posterPath, createdAt];
+      [id, title, photoIds, posterPath, feeling, createdAt];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1119,6 +1125,10 @@ class $JournalsTable extends Journals with TableInfo<$JournalsTable, Journal> {
     } else if (isInserting) {
       context.missing(_posterPathMeta);
     }
+    if (data.containsKey('feeling')) {
+      context.handle(_feelingMeta,
+          feeling.isAcceptableOrUnknown(data['feeling']!, _feelingMeta));
+    }
     if (data.containsKey('created_at')) {
       context.handle(_createdAtMeta,
           createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
@@ -1140,6 +1150,8 @@ class $JournalsTable extends Journals with TableInfo<$JournalsTable, Journal> {
           .read(DriftSqlType.string, data['${effectivePrefix}photo_ids'])!,
       posterPath: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}poster_path'])!,
+      feeling: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}feeling']),
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
     );
@@ -1166,6 +1178,12 @@ class Journal extends DataClass implements Insertable<Journal> {
   /// 海报图片在本地文件系统中的绝对路径
   final String posterPath;
 
+  /// 用户感受文字（可选，多行输入）
+  ///
+  /// 在海报生成页中用户可以输入此刻的感受，
+  /// 文字会渲染到海报长图上并持久化到数据库。
+  final String? feeling;
+
   /// 海报创建时间
   final DateTime createdAt;
   const Journal(
@@ -1173,6 +1191,7 @@ class Journal extends DataClass implements Insertable<Journal> {
       required this.title,
       required this.photoIds,
       required this.posterPath,
+      this.feeling,
       required this.createdAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1181,6 +1200,9 @@ class Journal extends DataClass implements Insertable<Journal> {
     map['title'] = Variable<String>(title);
     map['photo_ids'] = Variable<String>(photoIds);
     map['poster_path'] = Variable<String>(posterPath);
+    if (!nullToAbsent || feeling != null) {
+      map['feeling'] = Variable<String>(feeling);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -1191,6 +1213,9 @@ class Journal extends DataClass implements Insertable<Journal> {
       title: Value(title),
       photoIds: Value(photoIds),
       posterPath: Value(posterPath),
+      feeling: feeling == null && nullToAbsent
+          ? const Value.absent()
+          : Value(feeling),
       createdAt: Value(createdAt),
     );
   }
@@ -1203,6 +1228,7 @@ class Journal extends DataClass implements Insertable<Journal> {
       title: serializer.fromJson<String>(json['title']),
       photoIds: serializer.fromJson<String>(json['photoIds']),
       posterPath: serializer.fromJson<String>(json['posterPath']),
+      feeling: serializer.fromJson<String?>(json['feeling']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -1214,6 +1240,7 @@ class Journal extends DataClass implements Insertable<Journal> {
       'title': serializer.toJson<String>(title),
       'photoIds': serializer.toJson<String>(photoIds),
       'posterPath': serializer.toJson<String>(posterPath),
+      'feeling': serializer.toJson<String?>(feeling),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -1223,12 +1250,14 @@ class Journal extends DataClass implements Insertable<Journal> {
           String? title,
           String? photoIds,
           String? posterPath,
+          Value<String?> feeling = const Value.absent(),
           DateTime? createdAt}) =>
       Journal(
         id: id ?? this.id,
         title: title ?? this.title,
         photoIds: photoIds ?? this.photoIds,
         posterPath: posterPath ?? this.posterPath,
+        feeling: feeling.present ? feeling.value : this.feeling,
         createdAt: createdAt ?? this.createdAt,
       );
   Journal copyWithCompanion(JournalsCompanion data) {
@@ -1238,6 +1267,7 @@ class Journal extends DataClass implements Insertable<Journal> {
       photoIds: data.photoIds.present ? data.photoIds.value : this.photoIds,
       posterPath:
           data.posterPath.present ? data.posterPath.value : this.posterPath,
+      feeling: data.feeling.present ? data.feeling.value : this.feeling,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -1249,13 +1279,15 @@ class Journal extends DataClass implements Insertable<Journal> {
           ..write('title: $title, ')
           ..write('photoIds: $photoIds, ')
           ..write('posterPath: $posterPath, ')
+          ..write('feeling: $feeling, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, title, photoIds, posterPath, createdAt);
+  int get hashCode =>
+      Object.hash(id, title, photoIds, posterPath, feeling, createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1264,6 +1296,7 @@ class Journal extends DataClass implements Insertable<Journal> {
           other.title == this.title &&
           other.photoIds == this.photoIds &&
           other.posterPath == this.posterPath &&
+          other.feeling == this.feeling &&
           other.createdAt == this.createdAt);
 }
 
@@ -1272,12 +1305,14 @@ class JournalsCompanion extends UpdateCompanion<Journal> {
   final Value<String> title;
   final Value<String> photoIds;
   final Value<String> posterPath;
+  final Value<String?> feeling;
   final Value<DateTime> createdAt;
   const JournalsCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
     this.photoIds = const Value.absent(),
     this.posterPath = const Value.absent(),
+    this.feeling = const Value.absent(),
     this.createdAt = const Value.absent(),
   });
   JournalsCompanion.insert({
@@ -1285,6 +1320,7 @@ class JournalsCompanion extends UpdateCompanion<Journal> {
     required String title,
     required String photoIds,
     required String posterPath,
+    this.feeling = const Value.absent(),
     this.createdAt = const Value.absent(),
   })  : title = Value(title),
         photoIds = Value(photoIds),
@@ -1294,6 +1330,7 @@ class JournalsCompanion extends UpdateCompanion<Journal> {
     Expression<String>? title,
     Expression<String>? photoIds,
     Expression<String>? posterPath,
+    Expression<String>? feeling,
     Expression<DateTime>? createdAt,
   }) {
     return RawValuesInsertable({
@@ -1301,6 +1338,7 @@ class JournalsCompanion extends UpdateCompanion<Journal> {
       if (title != null) 'title': title,
       if (photoIds != null) 'photo_ids': photoIds,
       if (posterPath != null) 'poster_path': posterPath,
+      if (feeling != null) 'feeling': feeling,
       if (createdAt != null) 'created_at': createdAt,
     });
   }
@@ -1310,12 +1348,14 @@ class JournalsCompanion extends UpdateCompanion<Journal> {
       Value<String>? title,
       Value<String>? photoIds,
       Value<String>? posterPath,
+      Value<String?>? feeling,
       Value<DateTime>? createdAt}) {
     return JournalsCompanion(
       id: id ?? this.id,
       title: title ?? this.title,
       photoIds: photoIds ?? this.photoIds,
       posterPath: posterPath ?? this.posterPath,
+      feeling: feeling ?? this.feeling,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -1335,6 +1375,9 @@ class JournalsCompanion extends UpdateCompanion<Journal> {
     if (posterPath.present) {
       map['poster_path'] = Variable<String>(posterPath.value);
     }
+    if (feeling.present) {
+      map['feeling'] = Variable<String>(feeling.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1348,6 +1391,7 @@ class JournalsCompanion extends UpdateCompanion<Journal> {
           ..write('title: $title, ')
           ..write('photoIds: $photoIds, ')
           ..write('posterPath: $posterPath, ')
+          ..write('feeling: $feeling, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -1927,6 +1971,7 @@ typedef $$JournalsTableCreateCompanionBuilder = JournalsCompanion Function({
   required String title,
   required String photoIds,
   required String posterPath,
+  Value<String?> feeling,
   Value<DateTime> createdAt,
 });
 typedef $$JournalsTableUpdateCompanionBuilder = JournalsCompanion Function({
@@ -1934,6 +1979,7 @@ typedef $$JournalsTableUpdateCompanionBuilder = JournalsCompanion Function({
   Value<String> title,
   Value<String> photoIds,
   Value<String> posterPath,
+  Value<String?> feeling,
   Value<DateTime> createdAt,
 });
 
@@ -1957,6 +2003,9 @@ class $$JournalsTableFilterComposer
 
   ColumnFilters<String> get posterPath => $composableBuilder(
       column: $table.posterPath, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get feeling => $composableBuilder(
+      column: $table.feeling, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
@@ -1983,6 +2032,9 @@ class $$JournalsTableOrderingComposer
   ColumnOrderings<String> get posterPath => $composableBuilder(
       column: $table.posterPath, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get feeling => $composableBuilder(
+      column: $table.feeling, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 }
@@ -2007,6 +2059,9 @@ class $$JournalsTableAnnotationComposer
 
   GeneratedColumn<String> get posterPath => $composableBuilder(
       column: $table.posterPath, builder: (column) => column);
+
+  GeneratedColumn<String> get feeling =>
+      $composableBuilder(column: $table.feeling, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -2039,6 +2094,7 @@ class $$JournalsTableTableManager extends RootTableManager<
             Value<String> title = const Value.absent(),
             Value<String> photoIds = const Value.absent(),
             Value<String> posterPath = const Value.absent(),
+            Value<String?> feeling = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
           }) =>
               JournalsCompanion(
@@ -2046,6 +2102,7 @@ class $$JournalsTableTableManager extends RootTableManager<
             title: title,
             photoIds: photoIds,
             posterPath: posterPath,
+            feeling: feeling,
             createdAt: createdAt,
           ),
           createCompanionCallback: ({
@@ -2053,6 +2110,7 @@ class $$JournalsTableTableManager extends RootTableManager<
             required String title,
             required String photoIds,
             required String posterPath,
+            Value<String?> feeling = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
           }) =>
               JournalsCompanion.insert(
@@ -2060,6 +2118,7 @@ class $$JournalsTableTableManager extends RootTableManager<
             title: title,
             photoIds: photoIds,
             posterPath: posterPath,
+            feeling: feeling,
             createdAt: createdAt,
           ),
           withReferenceMapper: (p0) => p0

@@ -109,6 +109,10 @@ class BlitzController extends Notifier<BlitzState> {
     state = state.copyWith(
       isLoading: true,
       errorMessage: () => null,
+      sessionDeleted: const [],
+      sessionKept: const [],
+      sessionFavorites: const [],
+      sessionPending: const [],
     );
 
     try {
@@ -140,6 +144,7 @@ class BlitzController extends Notifier<BlitzState> {
 
       state = state.copyWith(
         photoGroups: groups,
+        totalPhotoCount: flatPhotos.length,
         currentGroupIndex: 0,
         currentEnergy: energyStatus.energy,
         isLoading: false,
@@ -472,6 +477,8 @@ class BlitzController extends Notifier<BlitzState> {
   /// 清空本轮内存草稿（用户中途退出时调用）
   void clearSessionDraft() {
     state = state.copyWith(
+      photoGroups: const [],
+      currentGroupIndex: 0,
       sessionDeleted: const [],
       sessionKept: const [],
       sessionFavorites: const [],

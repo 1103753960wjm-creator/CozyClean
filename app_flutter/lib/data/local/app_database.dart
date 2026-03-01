@@ -67,6 +67,12 @@ class Journals extends Table {
   /// 海报图片在本地文件系统中的绝对路径
   TextColumn get posterPath => text()();
 
+  /// 用户感受文字（可选，多行输入）
+  ///
+  /// 在海报生成页中用户可以输入此刻的感受，
+  /// 文字会渲染到海报长图上并持久化到数据库。
+  TextColumn get feeling => text().nullable()();
+
   /// 海报创建时间
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }
@@ -76,7 +82,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -86,6 +92,10 @@ class AppDatabase extends _$AppDatabase {
         onUpgrade: (Migrator m, int from, int to) async {
           if (from < 2) {
             await m.createTable(journals);
+          }
+          if (from < 3) {
+            // v2→v3: Journals 表新增 feeling 字段
+            await m.addColumn(journals, journals.feeling);
           }
         },
       );

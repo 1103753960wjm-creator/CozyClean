@@ -225,13 +225,19 @@ class _SummaryPageState extends ConsumerState<SummaryPage>
       await Future.delayed(const Duration(milliseconds: 300));
 
       // 这句代码将调用系统级权限弹框 (iOS/Android) 询问用户是否允许删除
-      final deletedList = await PhotoManager.editor.deleteWithIds(idsToDelete);
+      List<String> deletedList = [];
+      if (idsToDelete.isNotEmpty) {
+        deletedList = await PhotoManager.editor.deleteWithIds(idsToDelete);
+      }
 
       print('[SummaryPage] 物理删除结果: $deletedList');
 
       if (!mounted) return;
 
-      if (deletedList.isNotEmpty) {
+      // 如果本来就无需删除，或者删除成功，都视为整体交互成功
+      final isSuccess = idsToDelete.isEmpty || deletedList.isNotEmpty;
+
+      if (isSuccess) {
         _actualDeletedCount = deletedList.length;
         _deleteFinished = true;
         _confettiController.play(); // 播撒欢乐纸屑
@@ -251,10 +257,10 @@ class _SummaryPageState extends ConsumerState<SummaryPage>
             savedBytes: savedBytes);
         ref.read(blitzControllerProvider.notifier).clearSessionDraft();
       } else {
-        // 用户拒绝了弹窗授权或系统内部失败
-        _errorMessage = '操作被取消或没删除成功 (deletedList 为空)';
+        // 用户有需要删除的照片，但底层返回空，代表被用户拒绝授权或底层失败
+        _errorMessage = '操作被取消或清理失败';
         print(
-            '[SummaryPage] 错误: deletedList is empty, possibly user cancelled or ETXTBSY');
+            '[SummaryPage] 错误: deletedList is empty despite requesting deletions.');
         _deleteFinished = true;
       }
     } catch (e, stack) {
@@ -545,115 +551,116 @@ class _SummaryPageState extends ConsumerState<SummaryPage>
     final bool isSuccess = _actualDeletedCount > 0 && _errorMessage == null;
 
     return SafeArea(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Spacer(flex: 2),
-
-          // 顶部 Emoji
-          Text(
-            isSuccess ? '✨' : '😅',
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 72),
-          ),
-          const SizedBox(height: 16),
-
-          // 庆祝/提示文案
-          Text(
-            isSuccess ? '清理完成！' : '清理已被中止',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: isSuccess ? const Color(0xFF4A6B48) : Colors.black54,
-            ),
-          ),
-
-          if (!isSuccess) ...[
-            const SizedBox(height: 12),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(vertical: 32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 顶部 Emoji
             Text(
-              _errorMessage ?? '未做任何修改',
+              isSuccess ? '✨' : '😅',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.redAccent, fontSize: 14),
+              style: const TextStyle(fontSize: 72),
+            ),
+            const SizedBox(height: 16),
+
+            // 庆祝/提示文案
+            Text(
+              isSuccess ? '清理完成！' : '清理已被中止',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: isSuccess ? const Color(0xFF4A6B48) : Colors.black54,
+              ),
+            ),
+
+            if (!isSuccess) ...[
+              const SizedBox(height: 12),
+              Text(
+                _errorMessage ?? '未做任何修改',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.redAccent, fontSize: 14),
+              ),
+            ],
+
+            const SizedBox(height: 48),
+
+            // 无论成功失败，只要有数字都会展示
+            if (isSuccess)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
+                child: Container(
+                  padding: const EdgeInsets.all(30),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF8BA888).withOpacity(0.15),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      _buildStatRow(
+                        label: '真实清理',
+                        targetValue: _actualDeletedCount.toDouble(),
+                        suffix: '张',
+                        isFloat: false,
+                      ),
+                      const SizedBox(height: 20),
+                      const Divider(color: Color(0xFFE8F0E6), thickness: 1.5),
+                      const SizedBox(height: 20),
+                      _buildStatRow(
+                        label: '预估释放',
+                        targetValue: _actualDeletedCount * _savingsPerPhotoMb,
+                        suffix: 'MB',
+                        isFloat: true,
+                        highlight: true,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            // 收藏照片堆叠展示 + 生成手账海报按钮
+            if (isSuccess && widget.favoriteSet.isNotEmpty)
+              _buildFavoritesSection(),
+
+            const SizedBox(height: 24),
+
+            // 底部胶囊按钮
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor:
+                      isSuccess ? const Color(0xFF8BA888) : Colors.grey[400],
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  elevation: 4,
+                  shadowColor:
+                      (isSuccess ? const Color(0xFF8BA888) : Colors.grey)
+                          .withOpacity(0.4),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+                child: Text(
+                  isSuccess ? '太棒了！返回首页' : '明白了，返回首页',
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
             ),
           ],
-
-          const SizedBox(height: 48),
-
-          // 无论成功失败，只要有数字都会展示
-          if (isSuccess)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
-              child: Container(
-                padding: const EdgeInsets.all(30),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF8BA888).withOpacity(0.15),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    _buildStatRow(
-                      label: '真实清理',
-                      targetValue: _actualDeletedCount.toDouble(),
-                      suffix: '张',
-                      isFloat: false,
-                    ),
-                    const SizedBox(height: 20),
-                    const Divider(color: Color(0xFFE8F0E6), thickness: 1.5),
-                    const SizedBox(height: 20),
-                    _buildStatRow(
-                      label: '预估释放',
-                      targetValue: _actualDeletedCount * _savingsPerPhotoMb,
-                      suffix: 'MB',
-                      isFloat: true,
-                      highlight: true,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-          // 收藏照片堆叠展示 + 生成手账海报按钮
-          if (isSuccess && widget.favoriteSet.isNotEmpty)
-            _buildFavoritesSection(),
-
-          const Spacer(flex: 3),
-
-          // 底部胶囊按钮
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).popUntil((route) => route.isFirst);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    isSuccess ? const Color(0xFF8BA888) : Colors.grey[400],
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                elevation: 4,
-                shadowColor: (isSuccess ? const Color(0xFF8BA888) : Colors.grey)
-                    .withOpacity(0.4),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30),
-                ),
-              ),
-              child: Text(
-                isSuccess ? '太棒了！返回首页' : '明白了，返回首页',
-                style:
-                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
