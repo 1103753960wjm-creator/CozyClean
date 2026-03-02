@@ -159,7 +159,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
       SnackBar(
         content:
             const Text('收藏已满 6 张，先去生成手账海报吧 ✨', textAlign: TextAlign.center),
-        backgroundColor: const Color(0xFFD4AF37),
+        backgroundColor: const Color(0xFFFFD54F),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -240,6 +240,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
             Expanded(
               child: Stack(
                 children: [
+                  _buildEdgeGradientsLayer(blitzState),
                   _buildPendingReviewSwiper(blitzState),
                 ],
               ),
@@ -265,6 +266,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
               Expanded(
                 child: Stack(
                   children: [
+                    _buildEdgeGradientsLayer(blitzState),
                     _buildSwiperContainer(blitzState),
                   ],
                 ),
@@ -714,79 +716,200 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
 
   /// 底部操作区 (5个圆形按钮)
   Widget _buildActionButtons(BlitzState blitzState) {
-    return Padding(
-      padding: const EdgeInsets.only(
-          bottom: 12, left: 24, right: 24), // 缩小底边距，因为外设 Spacer
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          // 1. 撤销
-          _buildCircleButton(
-            icon: Icons.replay_rounded,
-            label: '撤销',
-            onTap: _requestUndo,
-            color: const Color(0xFF9E9E9E),
-            size: 50,
+    final controller = blitzState.isReviewingPending
+        ? _pendingSwiperController
+        : _swiperController;
+
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) {
+        double deleteProgress = 0.0;
+        double keepProgress = 0.0;
+        double highlightProgress = 0.0;
+        double pendingProgress = 0.0;
+
+        final progress = controller.swipeProgress;
+        if (progress != null) {
+          final dx = progress.dx;
+          final dy = progress.dy;
+          if (dx == 0 && dy == 0) {
+            // unchanged
+          } else if (dx.abs() >= dy.abs()) {
+            if (dx < 0) {
+              deleteProgress = (dx.abs() * 1.5).clamp(0.0, 1.0);
+            } else {
+              keepProgress = (dx.abs() * 1.5).clamp(0.0, 1.0);
+            }
+          } else {
+            if (dy < 0) {
+              highlightProgress = (dy.abs() * 1.5).clamp(0.0, 1.0);
+            } else {
+              pendingProgress = (dy.abs() * 1.5).clamp(0.0, 1.0);
+            }
+          }
+        }
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12, left: 24, right: 24),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // 1. 撤销
+              _buildCircleButton(
+                icon: Icons.replay_rounded,
+                label: '撤销',
+                onTap: _requestUndo,
+                color: const Color(0xFF9E9E9E),
+                size: 50,
+              ),
+              // 2. 删除 (红)
+              _buildDynamicActionButton(
+                outlineIcon: Icons.delete_outline_rounded,
+                solidIcon: Icons.delete_rounded,
+                label: '删除',
+                baseSize: 50,
+                activeColor: const Color(0xFFE57373),
+                activeBorderColor: const Color(0xFFFFCDD2),
+                progress: deleteProgress,
+                onTap: () {
+                  if (blitzState.isReviewingPending) {
+                    ref
+                        .read(blitzControllerProvider.notifier)
+                        .reviewPendingLeft();
+                  } else {
+                    _swiperController.swipeLeft();
+                  }
+                },
+              ),
+              // 3. 稍后/待定 (粉边圈转蓝)
+              _buildDynamicActionButton(
+                outlineIcon: Icons.arrow_downward_rounded,
+                solidIcon: Icons.arrow_downward_rounded,
+                label: '稍后',
+                baseSize: 70,
+                baseBorderColor: const Color(0xFFC79E9A).withValues(alpha: 0.5),
+                activeColor: const Color(0xFF64B5F6),
+                activeBorderColor: const Color(0xFFBBDEFB),
+                progress: pendingProgress,
+                onTap: blitzState.isReviewingPending
+                    ? null
+                    : () => _swiperController.swipeDown(),
+              ),
+              // 4. 高光 (金)
+              _buildDynamicActionButton(
+                outlineIcon: Icons.star_border_rounded,
+                solidIcon: Icons.star_rounded,
+                label: '高光',
+                baseSize: 50,
+                activeColor: const Color(0xFFFFD54F),
+                activeBorderColor: const Color(0xFFFFE082),
+                progress: highlightProgress,
+                onTap: () {
+                  if (blitzState.isReviewingPending) {
+                    final success = ref
+                        .read(blitzControllerProvider.notifier)
+                        .reviewPendingUp();
+                    if (!success) _showFavoritesFullWarning();
+                  } else {
+                    _swiperController.swipeUp();
+                  }
+                },
+              ),
+              // 5. 珍藏 (绿)
+              _buildDynamicActionButton(
+                outlineIcon: Icons.favorite_border_rounded,
+                solidIcon: Icons.favorite_rounded,
+                label: '珍藏',
+                baseSize: 50,
+                activeColor: const Color(0xFF5A7D55),
+                activeBorderColor: const Color(0xFFA5D6A7),
+                progress: keepProgress,
+                onTap: () {
+                  if (blitzState.isReviewingPending) {
+                    ref
+                        .read(blitzControllerProvider.notifier)
+                        .reviewPendingRight();
+                  } else {
+                    _swiperController.swipeRight();
+                  }
+                },
+              ),
+            ],
           ),
-          // 2. 删除
-          _buildCircleButton(
-            icon: Icons.delete_outline_rounded, // 更细的删除标
-            label: '删除',
-            onTap: () {
-              if (blitzState.isReviewingPending) {
-                ref.read(blitzControllerProvider.notifier).reviewPendingLeft();
-              } else {
-                _swiperController.swipeLeft();
-              }
-            },
-            color: const Color(0xFF8C7A76),
-            size: 50,
+        );
+      },
+    );
+  }
+
+  /// 动态变化的反馈操作按钮
+  Widget _buildDynamicActionButton({
+    required IconData outlineIcon,
+    required IconData solidIcon,
+    required String label,
+    required VoidCallback? onTap,
+    required double progress,
+    required double baseSize,
+    required Color activeColor,
+    required Color activeBorderColor,
+    Color? baseBorderColor,
+  }) {
+    final size = baseSize + (14.0 * progress);
+    final bgColor = Color.lerp(Colors.white, activeColor, progress)!;
+    final iconColor =
+        Color.lerp(const Color(0xFF8C7A76), Colors.white, progress)!;
+    final borderColor = Color.lerp(baseBorderColor ?? const Color(0xFFE5DFD3),
+        activeBorderColor, progress)!;
+    final textColor =
+        Color.lerp(const Color(0xFF8C867E), activeColor, progress)!;
+    final glowOpacity = (progress * 0.5).clamp(0.0, 0.5);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              color: bgColor,
+              shape: BoxShape.circle,
+              border: Border.all(color: borderColor, width: 1 + progress),
+              boxShadow: [
+                if (progress == 0)
+                  BoxShadow(
+                    color: const Color(0xFF8C7A76).withValues(alpha: 0.08),
+                    blurRadius: 10,
+                    spreadRadius: 2,
+                    offset: const Offset(0, 4),
+                  ),
+                if (progress > 0)
+                  BoxShadow(
+                    color: activeColor.withValues(alpha: glowOpacity),
+                    blurRadius: 15,
+                    spreadRadius: 4,
+                  ),
+              ],
+            ),
+            child: Icon(
+              progress > 0.1 ? solidIcon : outlineIcon,
+              color: iconColor,
+              size: size * 0.45,
+            ),
           ),
-          // 3. 稍后 (大粉圈)
-          _buildCircleButton(
-            icon: Icons.arrow_downward_rounded, // 箭头向下代替表盘
-            label: '稍后',
-            onTap: blitzState.isReviewingPending
-                ? null
-                : () => _swiperController.swipeDown(),
-            color: const Color(0xFFC79E9A), // 粉偏棕色
-            size: 70,
-            isOutlined: true,
+        ),
+        SizedBox(height: 8 - (progress * 2)),
+        Text(
+          label,
+          style: TextStyle(
+            color: textColor,
+            fontSize: 12,
+            fontWeight: progress > 0 ? FontWeight.bold : FontWeight.w600,
+            letterSpacing: 1,
           ),
-          // 4. 高光
-          _buildCircleButton(
-            icon: Icons.star_border_rounded, // 细心的星星
-            label: '高光',
-            onTap: () {
-              if (blitzState.isReviewingPending) {
-                final success = ref
-                    .read(blitzControllerProvider.notifier)
-                    .reviewPendingUp();
-                if (!success) _showFavoritesFullWarning();
-              } else {
-                _swiperController.swipeUp();
-              }
-            },
-            color: const Color(0xFF8C7A76),
-            size: 50,
-          ),
-          // 5. 珍藏
-          _buildCircleButton(
-            icon: Icons.favorite_border_rounded, // 留空的爱心
-            label: '珍藏',
-            onTap: () {
-              if (blitzState.isReviewingPending) {
-                ref.read(blitzControllerProvider.notifier).reviewPendingRight();
-              } else {
-                _swiperController.swipeRight();
-              }
-            },
-            color: const Color(0xFF8C7A76),
-            size: 50,
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -844,75 +967,272 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
     );
   }
 
-  /// 待定区计数器 — 按操作按钮下方显示
+  /// 四方向边缘渐变高亮预警
+  Widget _buildEdgeGradientsLayer(BlitzState blitzState) {
+    final controller = blitzState.isReviewingPending
+        ? _pendingSwiperController
+        : _swiperController;
+
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) {
+        final progress = controller.swipeProgress;
+        if (progress == null) return const SizedBox.shrink();
+
+        final dx = progress.dx;
+        final dy = progress.dy;
+        if (dx == 0 && dy == 0) return const SizedBox.shrink();
+
+        final isHorizontal = dx.abs() >= dy.abs();
+        final opacity =
+            ((isHorizontal ? dx.abs() : dy.abs()) * 1.5).clamp(0.0, 1.0);
+
+        List<Color> gradientColors;
+        Alignment begin;
+        Alignment end;
+        double? left, right, top, bottom;
+        final screenWidth = MediaQuery.of(context).size.width;
+        final screenHeight = MediaQuery.of(context).size.height;
+
+        double width = screenWidth;
+        double height = screenHeight;
+
+        if (isHorizontal) {
+          top = 0;
+          bottom = 0;
+          width = screenWidth / 3.5;
+          if (dx < 0) {
+            // Delete: Left, Red
+            left = 0;
+            begin = Alignment.centerLeft;
+            end = Alignment.centerRight;
+            gradientColors = [
+              const Color(0xFFE57373).withValues(alpha: 0.25),
+              Colors.transparent
+            ];
+          } else {
+            // Keep: Right, Green
+            right = 0;
+            begin = Alignment.centerRight;
+            end = Alignment.centerLeft;
+            gradientColors = [
+              const Color(0xFF5A7D55).withValues(alpha: 0.25),
+              Colors.transparent
+            ];
+          }
+        } else {
+          left = 0;
+          right = 0;
+          height = screenHeight / 3.5;
+          if (dy < 0) {
+            // Highlight: Top, Gold
+            top = 0;
+            begin = Alignment.topCenter;
+            end = Alignment.bottomCenter;
+            gradientColors = [
+              const Color(0xFFFFD54F).withValues(alpha: 0.25),
+              Colors.transparent
+            ];
+          } else {
+            // Pending: Bottom, Blue
+            bottom = 0;
+            begin = Alignment.bottomCenter;
+            end = Alignment.topCenter;
+            gradientColors = [
+              const Color(0xFF64B5F6).withValues(alpha: 0.25),
+              Colors.transparent
+            ];
+          }
+        }
+
+        return Positioned(
+          left: left,
+          right: right,
+          top: top,
+          bottom: bottom,
+          width:
+              (left != null || right != null) && (left == null || right == null)
+                  ? width
+                  : null,
+          height:
+              (top != null || bottom != null) && (top == null || bottom == null)
+                  ? height
+                  : null,
+          child: Opacity(
+            opacity: opacity,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: begin,
+                  end: end,
+                  colors: gradientColors,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// 待定区计数器 — 按操作按钮下方显示 (参照原型：层叠白纸与浮动提示)
   ///
   /// 仅当 `pendingCount > 0` 且不在回放阶段时显示。
-  /// 使用 `AnimatedSwitcher` 实现数字跳动效果，
-  /// 以及 `AnimatedScale` 实现飞入时的弹跳反馈。
   Widget _buildPendingCounter(BlitzState blitzState) {
     final count = blitzState.pendingCount;
     // 回放阶段或无待定照片时不显示
     if (count == 0 || blitzState.isReviewingPending) {
-      return const SizedBox(height: 20);
+      return const SizedBox(height: 60); // 占相同高度防止跳动
     }
 
+    // “张待定” 文本
+    final textWidget = AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      transitionBuilder: (child, animation) {
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 0.5),
+            end: Offset.zero,
+          ).animate(animation),
+          child: FadeTransition(opacity: animation, child: child),
+        );
+      },
+      child: Text(
+        '$count张待定',
+        key: ValueKey<int>(count),
+        style: const TextStyle(
+          fontSize: 13,
+          color: Color(0xFF4A3B32), // text-main
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+
     return AnimatedScale(
-      scale: _showPendingFly ? 1.15 : 1.0,
+      scale: _showPendingFly ? 1.05 : 1.0,
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeOutBack,
-      child: Padding(
+      child: SizedBox(
         key: _pendingCounterKey,
-        padding: const EdgeInsets.only(top: 8, bottom: 4),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFAF6F0), // 浅暖白
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: const Color(0xFFE0D8CC), // 暖灰边框
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.schedule_rounded,
-                size: 14,
-                color: Color(0xFFA89985),
-              ),
-              const SizedBox(width: 4),
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                transitionBuilder: (child, animation) {
-                  return SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0, 0.5),
-                      end: Offset.zero,
-                    ).animate(animation),
-                    child: FadeTransition(opacity: animation, child: child),
-                  );
-                },
-                child: Text(
-                  '$count张待定',
-                  key: ValueKey<int>(count),
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF8A7D6D),
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
+        height: 60, // 为底部重叠留出固定高度
+        child: Stack(
+          clipBehavior: Clip.none, // 允许提示框和纸张浮出边界
+          alignment: Alignment.bottomCenter,
+          children: [
+            // 底层纸张 1 (-6度)
+            Positioned(
+              bottom: -15,
+              child: Transform.rotate(
+                angle: -0.104, // ~ -6 deg
+                child: Container(
+                  width: 128, // w-32
+                  height: 64, // h-16
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border:
+                        Border.all(color: const Color(0xFFE5E7EB)), // stone-200
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(24)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+            // 中层纸张 2 (3度)
+            Positioned(
+              bottom: -15,
+              child: Transform.rotate(
+                angle: 0.052, // ~ 3 deg
+                child: Container(
+                  width: 128,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(24)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // 最上层纸张 3 (-1度 + 更深阴影)
+            Positioned(
+              bottom: -15,
+              child: Transform.rotate(
+                angle: -0.017, // ~ -1 deg
+                child: Container(
+                  width: 128,
+                  height: 64,
+                  padding: const EdgeInsets.only(top: 8),
+                  alignment: Alignment.topCenter,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(24)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 10,
+                        offset: const Offset(0, -3), // shadow-polaroid
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // 浮动带有倒三角的文字气泡
+            Positioned(
+              bottom: 25, // 向上浮动盖过半张纸
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFDFBF7), // bg-paper
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                          color: const Color(0xFFD2B48C)), // border-[#D2B48C]
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: textWidget,
+                  ),
+                  // 手动绘制小倒三角
+                  Transform.translate(
+                    offset: const Offset(0, -1), // 往上微移避免缝隙
+                    child: CustomPaint(
+                      size: const Size(8, 6),
+                      painter: _TooltipTrianglePainter(
+                          color: const Color(0xFFD2B48C)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -968,7 +1288,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   minimumSize: const Size(double.infinity, 50),
-                  backgroundColor: const Color(0xFFD4AF37),
+                  backgroundColor: const Color(0xFFFFD54F),
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -1024,7 +1344,11 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                 return const SizedBox.shrink();
               }
               final group = groups[index];
-              return _buildPhotoCard(group.bestPhoto, group);
+              return _buildPhotoCard(
+                group.bestPhoto,
+                group,
+                isForeground: index == blitzState.currentGroupIndex,
+              );
             },
           ),
         ),
@@ -1093,6 +1417,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                 photo,
                 PhotoGroup(photos: [photo]),
                 stampController: _pendingSwiperController,
+                isForeground: index == blitzState.pendingReviewIndex,
               );
             },
           ),
@@ -1211,6 +1536,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
     AssetEntity photo,
     PhotoGroup group, {
     AppinioSwiperController? stampController,
+    bool isForeground = true,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -1284,8 +1610,8 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                         ),
                       ),
                     ),
-                  // 四方向印章层
-                  _buildStampLayer(stampController),
+                  // 四方向印章层 (仅在最前台卡片显示)
+                  if (isForeground) _buildStampLayer(stampController),
                 ],
               ),
             ),
@@ -1319,60 +1645,96 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
             ((isHorizontal ? dx.abs() : dy.abs()) * 1.5).clamp(0.0, 1.0);
 
         String label;
+        String subLabel;
+        IconData iconData;
         Color stampColor;
-        Alignment alignment;
         double angle;
 
         if (isHorizontal) {
           if (dx < 0) {
             label = 'DELETE';
-            stampColor = const Color(0xFFB71C1C);
-            alignment = Alignment.topRight;
-            angle = 0.2;
+            subLabel = '删除';
+            iconData = Icons.delete_outline_rounded;
+            stampColor = const Color(0xFFE57373);
+            angle = -0.2;
           } else {
             label = 'KEEP';
+            subLabel = '珍藏';
+            iconData = Icons.favorite_rounded;
             stampColor = const Color(0xFF5A7D55);
-            alignment = Alignment.topLeft;
-            angle = -0.2;
+            angle = 0.2;
           }
         } else {
           if (dy < 0) {
-            label = 'FAVE ❤️';
-            stampColor = const Color(0xFFE91E63);
-            alignment = Alignment.bottomCenter;
-            angle = 0.0;
+            label = 'FAVE';
+            subLabel = '高光';
+            iconData = Icons.star_rounded;
+            stampColor = const Color(0xFFFFD54F);
+            angle = -0.15;
           } else {
             label = 'SKIP';
-            stampColor = const Color(0xFF9E9E9E);
-            alignment = Alignment.topCenter;
-            angle = 0.0;
+            subLabel = '待定';
+            iconData = Icons.arrow_downward_rounded;
+            stampColor = const Color(0xFF64B5F6);
+            angle = 0.15;
           }
         }
 
         return Positioned.fill(
-          child: Align(
-            alignment: alignment,
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Opacity(
-                opacity: opacity,
+          child: Opacity(
+            opacity: opacity,
+            child: Container(
+              color: Colors.black.withOpacity(0.15), // 背景统一变灰暗
+              child: Center(
                 child: Transform.rotate(
                   angle: angle,
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    width: 160,
+                    height: 160,
                     decoration: BoxDecoration(
-                      border: Border.all(color: stampColor, width: 3.5),
-                      borderRadius: BorderRadius.circular(6),
+                      shape: BoxShape.circle,
+                      color: Colors.white.withOpacity(0.1),
+                      border: Border.all(color: stampColor, width: 6),
                     ),
-                    child: Text(
-                      label,
-                      style: TextStyle(
-                        color: stampColor,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 2,
-                      ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Container(
+                          width: 140,
+                          height: 140,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: stampColor.withOpacity(0.6), width: 2),
+                          ),
+                        ),
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(iconData, color: stampColor, size: 48),
+                            Text(
+                              label,
+                              style: TextStyle(
+                                color: stampColor,
+                                fontSize: 32,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 4,
+                                height: 1.0,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              subLabel,
+                              style: TextStyle(
+                                color: stampColor,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -1532,57 +1894,96 @@ class _SwipeablePendingCardState extends State<_SwipeablePendingCard>
         ((isHorizontal ? dx.abs() : dy.abs()) / _threshold).clamp(0.0, 1.0);
 
     String label;
+    String subLabel;
+    IconData iconData;
     Color stampColor;
-    Alignment alignment;
     double angle;
 
     if (isHorizontal) {
       if (dx < 0) {
         label = 'DELETE';
-        stampColor = const Color(0xFFB71C1C);
-        alignment = Alignment.topRight;
-        angle = 0.2;
+        subLabel = '删除';
+        iconData = Icons.delete_outline_rounded;
+        stampColor = const Color(0xFFE57373);
+        angle = -0.2;
       } else {
         label = 'KEEP';
+        subLabel = '珍藏';
+        iconData = Icons.favorite_rounded;
         stampColor = const Color(0xFF5A7D55);
-        alignment = Alignment.topLeft;
-        angle = -0.2;
+        angle = 0.2;
       }
     } else {
       if (dy < 0) {
-        label = 'FAVE ❤️';
-        stampColor = const Color(0xFFE91E63);
-        alignment = Alignment.bottomCenter;
-        angle = 0.0;
+        label = 'FAVE';
+        subLabel = '高光';
+        iconData = Icons.star_rounded;
+        stampColor = const Color(0xFFFFD54F);
+        angle = -0.15;
       } else {
-        return const SizedBox.shrink(); // 下拖不显示印章
+        label = 'SKIP';
+        subLabel = '待定';
+        iconData = Icons.arrow_downward_rounded;
+        stampColor = const Color(0xFF64B5F6);
+        angle = 0.15;
       }
     }
 
     return Positioned.fill(
-      child: Align(
-        alignment: alignment,
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Opacity(
-            opacity: progress,
+      child: Opacity(
+        opacity: progress,
+        child: Container(
+          color: Colors.black.withOpacity(0.15),
+          child: Center(
             child: Transform.rotate(
               angle: angle,
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                width: 160,
+                height: 160,
                 decoration: BoxDecoration(
-                  border: Border.all(color: stampColor, width: 3.5),
-                  borderRadius: BorderRadius.circular(6),
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.1),
+                  border: Border.all(color: stampColor, width: 6),
                 ),
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    color: stampColor,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
-                  ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 140,
+                      height: 140,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                            color: stampColor.withOpacity(0.6), width: 2),
+                      ),
+                    ),
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(iconData, color: stampColor, size: 48),
+                        Text(
+                          label,
+                          style: TextStyle(
+                            color: stampColor,
+                            fontSize: 32,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 4,
+                            height: 1.0,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          subLabel,
+                          style: TextStyle(
+                            color: stampColor,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -1590,5 +1991,33 @@ class _SwipeablePendingCardState extends State<_SwipeablePendingCard>
         ),
       ),
     );
+  }
+}
+
+/// Tooltip 底部倒三角绘制器
+class _TooltipTrianglePainter extends CustomPainter {
+  final Color color;
+
+  _TooltipTrianglePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    var path = Path();
+    path.moveTo(0, 0); // 左上
+    path.lineTo(size.width, 0); // 右上
+    path.lineTo(size.width / 2, size.height); // 底部顶点
+    path.close();
+
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.fill,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _TooltipTrianglePainter oldDelegate) {
+    return oldDelegate.color != color;
   }
 }

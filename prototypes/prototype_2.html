@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&amp;family=Noto+Serif+SC:wght@300;400;500;600;700&amp;family=Zhi+Mang+Xing&amp;family=Ma+Shan+Zheng&amp;family=Long+Cang&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ec5b13",
+                        "background-light": "#f8f6f6",
+                        "background-dark": "#221610",
+                        "scrapbook-cream": "#F5F5DC",
+                        "scrapbook-brown": "#5D4037",
+                        "scrapbook-ink": "#4A3B32",
+                        "scrapbook-accent": "#D4A373"
+                    },
+                    fontFamily: {
+                        "display": ["Public Sans", "Noto Serif SC", "serif"],
+                        "handwriting": ["Zhi Mang+Xing", "cursive"],
+                        "elegant-hand": ["Ma Shan Zheng", "cursive"],
+                        "artistic": ["Long Cang", "cursive"],
+                        "serif-sc": ["Noto Serif SC", "serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                    boxShadow: {
+                        'paper': '2px 4px 12px rgba(0,0,0,0.08)',
+                        'polaroid': '1px 3px 8px rgba(0,0,0,0.12)'
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        .dotted-bg {
+            background-image: radial-gradient(#d1d1b2 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .washi-tape {
+            background: rgba(236, 91, 19, 0.3);
+            box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+            mask-image: url('data:image/svg+xml;utf8,<svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><path d="M0,0 L100,0 L98,100 L2,100 Z" fill="black"/></svg>');
+        }
+
+        .washi-tape-pattern-1 {
+            background-image: repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(255, 255, 255, 0.3) 5px, rgba(255, 255, 255, 0.3) 10px);
+        }
+
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #F5F5DC;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #D4A373;
+            border-radius: 4px;
+        }
+    </style>
+    <style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+    <style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+    <style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+    <style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+
+<body class="bg-background-light dark:bg-background-dark font-display text-scrapbook-brown">
+    <div
+        class="relative flex min-h-screen w-full flex-col max-w-md mx-auto bg-scrapbook-cream shadow-2xl overflow-x-hidden dotted-bg">
+        <nav
+            class="flex items-center p-4 justify-between bg-scrapbook-cream/95 backdrop-blur-sm sticky top-0 z-50 border-b border-scrapbook-accent/20">
+            <button
+                class="flex size-10 items-center justify-center rounded-full hover:bg-scrapbook-accent/10 transition-colors">
+                <span class="material-symbols-outlined text-scrapbook-brown">arrow_back_ios_new</span>
+            </button>
+            <h2 class="text-scrapbook-brown text-lg font-bold leading-tight tracking-tight">手帐海报详情</h2>
+            <button
+                class="flex size-10 items-center justify-center rounded-full hover:bg-scrapbook-accent/10 transition-colors">
+                <span class="material-symbols-outlined text-scrapbook-brown">share</span>
+            </button>
+        </nav>
+        <main class="flex-1 overflow-y-auto pb-48">
+            <div class="px-6 pt-6 pb-2">
+                <div
+                    class="relative w-full bg-white shadow-paper rounded-sm p-6 overflow-hidden border border-scrapbook-accent/20 min-h-[600px] flex flex-col">
+                    <div
+                        class="absolute -top-3 -left-8 w-32 h-8 washi-tape washi-tape-pattern-1 bg-red-400/40 z-20 transform rotate-[-5deg]">
+                    </div>
+                    <div
+                        class="absolute top-[15%] -right-6 w-24 h-6 bg-green-700/10 rotate-45 z-0 rounded-full blur-xl">
+                    </div>
+                    <div class="absolute bottom-[20%] -left-8 w-40 h-40 bg-yellow-500/5 rounded-full blur-2xl z-0">
+                    </div>
+                    <div
+                        class="absolute -bottom-3 -right-6 w-32 h-8 washi-tape bg-blue-400/30 z-20 rotate-12 washi-tape-pattern-1">
+                    </div>
+                    <div class="relative h-full w-full flex flex-col z-10">
+                        <div class="text-center pt-6 pb-8 space-y-4">
+                            <h1
+                                class="font-serif-sc font-medium text-lg text-scrapbook-ink tracking-widest border-b border-scrapbook-accent/30 inline-block pb-1 px-4">
+                                宝宝的周岁聚会
+                            </h1>
+                            <div class="relative mt-2">
+                                <span
+                                    class="material-symbols-outlined absolute -top-4 left-[10%] text-yellow-400/40 text-lg rotate-[-12deg]">star</span>
+                                <p class="font-artistic text-xl text-scrapbook-accent/90 px-2 leading-relaxed">
+                                    "记录下这些美好的瞬间，<br />愿你永远快乐成长..."
+                                </p>
+                                <span
+                                    class="material-symbols-outlined absolute -bottom-2 right-[15%] text-scrapbook-accent/30 text-sm">auto_awesome</span>
+                            </div>
+                        </div>
+                        <div class="flex-1 flex flex-col justify-center items-center py-4 relative">
+                            <div
+                                class="absolute top-0 left-0 opacity-20 transform -translate-x-2 translate-y-4 -rotate-12 pointer-events-none">
+                                <span class="material-symbols-outlined text-6xl text-green-800">local_florist</span>
+                            </div>
+                            <div
+                                class="relative w-[75%] self-start transform rotate-[-3deg] z-10 transition-transform hover:rotate-0 hover:z-30 hover:scale-105 duration-300">
+                                <div
+                                    class="absolute -top-3 left-1/2 -translate-x-1/2 w-16 h-4 bg-yellow-200/60 shadow-sm z-20 rotate-2">
+                                </div>
+                                <div class="bg-white p-3 pb-10 shadow-polaroid border border-gray-100">
+                                    <div class="w-full aspect-[4/5] bg-cover bg-center sepia-[0.1]"
+                                        style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBvyTNzX84QW04IicKngKABUzAaoSvoPJl-dCjlTy0pd8RwD8JnQsTbGPd6Mv86K_MwOMucQmBI26BLqcrPmWyKzbShvimIY1zGrOzAYW7kBaW_YZM9LC82SeM82axbcMf9ZE5bEFrLtyKv_Wts8uhI4sFcDjbqFAWkxYUSF-lmcVj4OzjRqXYsy5cmJ-N_HooSMIB6lSAyjzDyUWjGAEU7QcBBjLJHmJHExuHRPyKRTnCadKqUvc5R62GC5Hwo4Vlpc3KlmKkVQfXJ");'>
+                                    </div>
+                                    <div class="absolute bottom-3 w-full left-0 text-center">
+                                        <p class="font-handwriting text-gray-500 text-sm">初次见面</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div
+                                class="relative w-[75%] self-end -mt-16 transform rotate-[4deg] z-20 transition-transform hover:rotate-0 hover:z-30 hover:scale-105 duration-300">
+                                <div
+                                    class="absolute -top-3 left-1/2 -translate-x-1/2 w-16 h-4 bg-blue-200/50 shadow-sm z-20 rotate-[-1deg]">
+                                </div>
+                                <div class="bg-white p-3 pb-10 shadow-polaroid border border-gray-100">
+                                    <div class="w-full aspect-[4/5] bg-cover bg-center contrast-110"
+                                        style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuB4S6yB2wKSCYlgfrKtQcrZhMzZVtA7vGGqzStwAgc2F6jKkOJqDjEaanARSz6Ip8GotmBb3NiG14j--HV3UYY6XbEVYEt-dhbw-Qcb1JlW3NrLXkla9hZoDLi_fiGmWuQrcR0HIlZvH6S9h2f3r6jv-vB0cOcatovGDEgeh_5FjZKZltuUkkF42dVfB4ydKklMCk_N5GMos9ULX-7fFLOKiXtSHUyPp_8bBpwkr-kQ-8Mc5otZBLBqajL6p26uc5nPEaUjx7ZnGRyS");'>
+                                    </div>
+                                    <div class="absolute bottom-3 w-full left-0 text-center">
+                                        <p class="font-handwriting text-gray-500 text-sm">开心的笑</p>
+                                    </div>
+                                </div>
+                                <span
+                                    class="absolute -bottom-4 -right-2 material-symbols-outlined text-yellow-400 text-3xl drop-shadow-sm rotate-12 z-30">star</span>
+                            </div>
+                            <div
+                                class="absolute bottom-10 right-0 opacity-20 transform translate-x-2 translate-y-4 rotate-12 pointer-events-none">
+                                <span class="material-symbols-outlined text-5xl text-scrapbook-brown">spa</span>
+                            </div>
+                        </div>
+                        <div class="mt-12 pt-6 border-t-2 border-dotted border-gray-200 relative">
+                            <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-white px-2 text-gray-300">
+                                <span class="material-symbols-outlined text-lg">cut</span>
+                            </div>
+                            <div class="flex flex-col items-center justify-center gap-1 text-center">
+                                <p
+                                    class="font-serif-sc text-[12px] text-scrapbook-brown/50 tracking-[0.1em] mb-2 font-medium">
+                                    记忆碎片整理</p>
+                                <div class="flex items-center gap-3">
+                                    <div
+                                        class="bg-scrapbook-cream/50 px-4 py-1.5 rounded-full border border-scrapbook-brown/10 backdrop-blur-sm">
+                                        <p class="text-xs font-serif-sc text-scrapbook-brown">保留照片 <span
+                                                class="text-primary font-bold mx-0.5">2</span> 张</p>
+                                    </div>
+                                    <div
+                                        class="bg-scrapbook-cream/50 px-4 py-1.5 rounded-full border border-scrapbook-brown/10 backdrop-blur-sm">
+                                        <p class="text-xs font-serif-sc text-scrapbook-brown">清理空间 <span
+                                                class="text-primary font-bold mx-0.5">18</span> MB</p>
+                                    </div>
+                                </div>
+                                <p class="font-handwriting text-gray-400 text-xs mt-3">Create your own memory</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 pb-6">
+                <div class="mt-2 flex items-center justify-between px-2">
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-scrapbook-brown/40 text-sm">event</span>
+                        <p class="text-xs font-serif-sc text-scrapbook-brown/60 tracking-wider">记录时间 2024.03.15</p>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <span class="material-symbols-outlined text-primary/80 text-sm fill-current">favorite</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+        <div
+            class="fixed bottom-0 left-0 right-0 bg-scrapbook-cream/95 backdrop-blur-md border-t border-scrapbook-accent/20 pb-safe z-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] max-w-md mx-auto">
+            <div class="flex flex-col gap-3 px-4 pt-4 pb-6">
+                <div class="flex items-center gap-2 justify-between">
+                    <button
+                        class="flex flex-col items-center justify-center size-[3.5rem] bg-white border border-scrapbook-brown/20 text-scrapbook-brown rounded-xl hover:bg-scrapbook-accent/10 transition-colors shadow-sm active:scale-95">
+                        <span class="material-symbols-outlined text-[20px] mb-0.5">edit</span>
+                        <span class="text-[10px] font-medium leading-none">编辑</span>
+                    </button>
+                    <button
+                        class="flex flex-col items-center justify-center size-[3.5rem] bg-white border border-scrapbook-brown/20 text-scrapbook-brown rounded-xl hover:bg-scrapbook-accent/10 transition-colors shadow-sm active:scale-95">
+                        <span class="material-symbols-outlined text-[20px] mb-0.5">home</span>
+                        <span class="text-[10px] font-medium leading-none">返回首页</span>
+                    </button>
+                    <button
+                        class="flex-1 flex flex-row items-center justify-center gap-2 h-[3.5rem] bg-scrapbook-brown text-scrapbook-cream rounded-xl font-bold shadow-md active:scale-95 transition-transform hover:bg-scrapbook-brown/90 px-3">
+                        <span class="material-symbols-outlined text-xl">ios_share</span>
+                        <span class="text-sm">分享至社交媒体</span>
+                    </button>
+                    <button
+                        class="flex flex-col items-center justify-center size-[3.5rem] bg-white border border-scrapbook-brown/20 text-red-500/80 rounded-xl hover:bg-red-50 hover:border-red-200 transition-colors shadow-sm active:scale-95">
+                        <span class="material-symbols-outlined text-[20px] mb-0.5">delete</span>
+                        <span class="text-[10px] font-medium leading-none">删除</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

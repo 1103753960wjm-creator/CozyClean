@@ -17,6 +17,7 @@ import 'package:share_plus/share_plus.dart';
 
 import 'package:cozy_clean/data/local/app_database.dart';
 import 'package:cozy_clean/features/journal/application/controllers/journal_controller.dart';
+import 'package:cozy_clean/features/journal/presentation/widgets/poster_components.dart';
 
 /// 手账详情页 — 全屏查看长图
 ///
@@ -128,79 +129,11 @@ class JournalDetailPage extends ConsumerWidget {
 
   /// 底部操作栏
   Widget _buildBottomBar(BuildContext context, WidgetRef ref) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFAF9F6),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Row(
-          children: [
-            // 删除按钮
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _confirmDelete(context, ref),
-                icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                label: const Text('删除'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFFC75D56),
-                  side: const BorderSide(color: Color(0xFFE0D8CC)),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            // 返回主页按钮
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                },
-                icon: const Icon(Icons.home_rounded, size: 18),
-                label: const Text('主页'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF8BA888),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            // 分享按钮
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: () =>
-                    _sharePoster(context, File(journal.posterPath)),
-                icon: const Icon(Icons.share_rounded, size: 18),
-                label: const Text('分享'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF8A6549),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return ScrapbookActionButtons(
+      onHome: () => Navigator.of(context).popUntil((route) => route.isFirst),
+      onShare: () => _sharePoster(context, File(journal.posterPath)),
+      onDelete: () => _confirmDelete(context, ref),
+      onEdit: null, // "编辑"按钮置空无效果
     );
   }
 

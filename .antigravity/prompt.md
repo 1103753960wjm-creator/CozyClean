@@ -387,4 +387,16 @@ Avoid shortcuts.
 
 ---
 
+# 19. Chinese Language Requirement (MANDATORY)
+
+You MUST use Chinese for all of the following:
+- Internal reasoning (thoughts)
+- Conversations to the user (chat/replies)
+- Writing implementation plans, tasks, and walkthroughs
+- Code comments (Dart doc comments and inline comments)
+
+This is a strict requirement without exceptions.
+
+---
+
 # END OF RULES

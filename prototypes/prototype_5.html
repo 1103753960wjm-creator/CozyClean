@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&amp;family=Noto+Serif+SC:wght@300;400;500;600;700&amp;family=Zhi+Mang+Xing&amp;family=Ma+Shan+Zheng&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ec5b13",
+                        "background-light": "#f8f6f6",
+                        "background-dark": "#221610",
+                        "scrapbook-cream": "#F5F5DC",
+                        "scrapbook-brown": "#5D4037",
+                        "scrapbook-accent": "#D4A373",
+                        "tape-pink": "#F8C8DC",
+                        "tape-blue": "#AEC6CF",
+                        "tape-green": "#C1E1C1"
+                    },
+                    fontFamily: {
+                        "display": ["Public Sans", "Noto Serif SC", "serif"],
+                        "handwriting": ["Zhi Mang+Xing", "cursive"],
+                        "serif-sc": ["Noto Serif SC", "serif"],
+                        "elegant-hand": ["Ma Shan Zheng", "cursive"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                    boxShadow: {
+                        'polaroid': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06), 2px 2px 8px rgba(0,0,0,0.15)',
+                        'polaroid-hover': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), 4px 4px 12px rgba(0,0,0,0.2)'
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        .dotted-bg {
+            background-image: radial-gradient(#d1d1b2 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .washi-tape {
+            background: rgba(236, 91, 19, 0.3);
+            box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .tape-pattern-1 {
+            background: repeating-linear-gradient(45deg, #F8C8DC, #F8C8DC 10px, #ffffff 10px, #ffffff 20px);
+            opacity: 0.8;
+        }
+
+        .tape-pattern-2 {
+            background-color: #AEC6CF;
+            background-image: radial-gradient(#ffffff 20%, transparent 20%);
+            background-size: 8px 8px;
+            opacity: 0.8;
+        }
+
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #F5F5DC;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #D4A373;
+            border-radius: 4px;
+        }
+    </style>
+    <style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+    <style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+    <style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+
+<body class="bg-background-light dark:bg-background-dark font-display text-scrapbook-brown">
+    <div
+        class="relative flex min-h-screen w-full flex-col max-w-md mx-auto bg-scrapbook-cream shadow-2xl overflow-x-hidden dotted-bg">
+        <nav
+            class="flex items-center p-4 justify-between bg-scrapbook-cream/95 backdrop-blur-sm sticky top-0 z-50 border-b border-scrapbook-accent/20">
+            <button
+                class="flex size-10 items-center justify-center rounded-full hover:bg-scrapbook-accent/10 transition-colors">
+                <span class="material-symbols-outlined text-scrapbook-brown">arrow_back_ios_new</span>
+            </button>
+            <h2 class="text-scrapbook-brown text-lg font-bold leading-tight tracking-tight">手帐海报详情</h2>
+            <button
+                class="flex size-10 items-center justify-center rounded-full hover:bg-scrapbook-accent/10 transition-colors">
+                <span class="material-symbols-outlined text-scrapbook-brown">share</span>
+            </button>
+        </nav>
+        <main class="flex-1 overflow-y-auto">
+            <div class="px-6 pt-6 pb-2">
+                <div
+                    class="relative w-full bg-white shadow-xl rounded-sm p-6 overflow-hidden border border-scrapbook-accent/20 min-h-[900px]">
+                    <div
+                        class="absolute -top-4 -left-8 w-40 h-10 washi-tape tape-pattern-1 z-20 rotate-[-5deg] shadow-md">
+                    </div>
+                    <div
+                        class="absolute top-[25%] -right-8 w-32 h-8 washi-tape bg-green-200/60 rotate-[45deg] z-0 opacity-50">
+                    </div>
+                    <div class="absolute bottom-[15%] -left-8 w-40 h-40 bg-yellow-200/20 rounded-full blur-3xl z-0">
+                    </div>
+                    <div class="absolute top-[10%] right-[10%] w-24 h-24 bg-pink-200/20 rounded-full blur-3xl z-0">
+                    </div>
+                    <div class="relative h-full w-full flex flex-col gap-6 z-10">
+                        <div class="text-center py-2 space-y-2 border-b border-dashed border-gray-200 pb-4">
+                            <h1
+                                class="font-elegant-hand font-normal text-2xl text-scrapbook-brown leading-relaxed pt-2 tracking-widest opacity-90">
+                                我们的五光十色</h1>
+                            <p class="font-handwriting text-lg text-scrapbook-accent/90 px-2 leading-tight">
+                                "把平凡的日子堆砌成闪闪发光的记忆。"</p>
+                            <div class="flex justify-center pt-1 gap-2">
+                                <span class="material-symbols-outlined text-yellow-500/80 text-sm">star</span>
+                                <span class="material-symbols-outlined text-pink-400/80 text-sm">favorite</span>
+                                <span class="material-symbols-outlined text-blue-400/80 text-sm">star</span>
+                            </div>
+                        </div>
+                        <div class="relative flex flex-col pt-2 pb-6 min-h-[500px]">
+                            <div
+                                class="absolute top-0 left-0 z-10 w-[48%] rotate-[-3deg] hover:rotate-0 transition-transform duration-300">
+                                <div
+                                    class="absolute -top-3 left-[20%] w-16 h-4 bg-tape-pink/60 -rotate-2 z-20 shadow-sm mix-blend-multiply">
+                                </div>
+                                <div class="bg-white p-2 pb-6 shadow-polaroid border border-gray-100">
+                                    <div class="w-full aspect-square bg-cover bg-center"
+                                        style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBvyTNzX84QW04IicKngKABUzAaoSvoPJl-dCjlTy0pd8RwD8JnQsTbGPd6Mv86K_MwOMucQmBI26BLqcrPmWyKzbShvimIY1zGrOzAYW7kBaW_YZM9LC82SeM82axbcMf9ZE5bEFrLtyKv_Wts8uhI4sFcDjbqFAWkxYUSF-lmcVj4OzjRqXYsy5cmJ-N_HooSMIB6lSAyjzDyUWjGAEU7QcBBjLJHmJHExuHRPyKRTnCadKqUvc5R62GC5Hwo4Vlpc3KlmKkVQfXJ");'>
+                                    </div>
+                                    <p class="font-handwriting text-sm mt-2 text-center text-gray-500 rotate-1">初遇</p>
+                                </div>
+                            </div>
+                            <div
+                                class="absolute top-8 right-0 z-20 w-[55%] rotate-[4deg] hover:rotate-0 transition-transform duration-300">
+                                <div
+                                    class="absolute -top-2 right-[20%] w-12 h-4 tape-pattern-2 rotate-2 z-20 shadow-sm">
+                                </div>
+                                <div class="bg-white p-2 pb-5 shadow-polaroid border border-gray-100">
+                                    <div class="w-full aspect-[4/3] bg-cover bg-center grayscale-[20%]"
+                                        style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuB4S6yB2wKSCYlgfrKtQcrZhMzZVtA7vGGqzStwAgc2F6jKkOJqDjEaanARSz6Ip8GotmBb3NiG14j--HV3UYY6XbEVYEt-dhbw-Qcb1JlW3NrLXkla9hZoDLi_fiGmWuQrcR0HIlZvH6S9h2f3r6jv-vB0cOcatovGDEgeh_5FjZKZltuUkkF42dVfB4ydKklMCk_N5GMos9ULX-7fFLOKiXtSHUyPp_8bBpwkr-kQ-8Mc5otZBLBqajL6p26uc5nPEaUjx7ZnGRyS");'>
+                                    </div>
+                                    <span
+                                        class="absolute -bottom-2 -right-2 material-symbols-outlined text-yellow-400 text-3xl drop-shadow-sm -rotate-12 z-30">verified</span>
+                                </div>
+                            </div>
+                            <div
+                                class="absolute top-[160px] left-[15%] z-30 w-[70%] rotate-[-1deg] hover:scale-105 transition-transform duration-300">
+                                <div
+                                    class="absolute -top-3 left-1/2 -translate-x-1/2 w-20 h-5 bg-yellow-200/50 rotate-[-1deg] z-20 shadow-sm">
+                                </div>
+                                <div class="bg-white p-3 pb-8 shadow-polaroid-hover border border-gray-50">
+                                    <div class="w-full aspect-[4/3] bg-cover bg-center"
+                                        style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAbvKqDnWYL69OBKfKv43uO4AVIH0k89TwhXNT15aBa-Gx7Umn3SuS5tqFsEvX8YUSd0YcxL4JqaJdVvk-8VivE9knkJz_vChjMr_hP4GroDFZOjfOiD2_cY434QUlVuJNMqefl3LQpr7wIohIsrsEpEVmUbGzi2cM3SsvZWliFO6A-wmGQkPf5cheLb-i48O7iY3pVANh-RxLo6OwMWbMMV6KKGYhyTxHKitXJlUJZWXyIBU_p0D0t5hwXI0zcv5Xu7VBGviETLU88");'>
+                                    </div>
+                                    <p class="font-handwriting text-lg mt-3 text-center text-scrapbook-brown">最好的我们</p>
+                                    <div class="absolute top-2 right-2 text-pink-300/40">
+                                        <span class="material-symbols-outlined text-4xl">favorite</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div
+                                class="absolute top-[340px] left-1 z-20 w-[42%] rotate-[6deg] hover:rotate-0 transition-transform duration-300">
+                                <div class="bg-white p-2 pb-4 shadow-polaroid border border-gray-100">
+                                    <div class="w-full aspect-square bg-cover bg-center sepia-[15%]"
+                                        style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDsI1cXMnTWHM1b_DoFz4UAOss_5DUTNc_A5pSI8JuqxF3_x4fkpR_8NE1oY0zPDD83CWQl87he-aYQb0vWaqMZwf5PsjmgR1RdB1xU4NZC6LM_gRklG40Yle_j0wjkkt482VHB9RxRzsVV8ULB_GXQ3nqnojqgp4Fp80Riea7DOlH6zlG1EKePfB43d-a_5ywV7ZR062YPd0UH_bia6_RBTy_Cbg-R5maqsBf1ah4dXtwyxRaNmchbfV37jHt5LWBihGGkWu2u1i9r");'>
+                                    </div>
+                                    <div
+                                        class="absolute -top-3 -left-2 material-symbols-outlined text-green-500/30 text-3xl rotate-[-20deg]">
+                                        eco</div>
+                                </div>
+                            </div>
+                            <div
+                                class="absolute top-[320px] right-0 z-10 w-[50%] rotate-[-5deg] hover:rotate-0 transition-transform duration-300">
+                                <div
+                                    class="absolute -bottom-3 right-[30%] w-14 h-4 bg-blue-200/50 rotate-3 z-20 shadow-sm">
+                                </div>
+                                <div class="bg-white p-2 pb-5 shadow-polaroid border border-gray-100">
+                                    <div class="w-full aspect-square bg-cover bg-center contrast-110"
+                                        style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDCQJ1zqnWMX0POO7tBanAc1_u2x-1NDZYrlfDV-db3qf3IO5qa7S3mY-C0M90iYnTUnzhRzSJtR5MeNS-mBLRcA7tZW-EMtzqX5Yhr3a9ZES4x7-bLxWN0H1qBc4HzkLtEGRFPCK2m_cjnmUWzWhVk9JepaYfrOTBDpaZtkHphsMybcflVVxMK3NCYvfvQRCkrnDXEADUWFvFukzDK5XqPHvxLy15AcrRDQlcwuPdHQqwZjhKRXqwcuTTcvOPJoQd44-icJR7_TQQV");'>
+                                    </div>
+                                    <p class="font-handwriting text-xs mt-2 text-right pr-2 text-gray-400 font-mono">
+                                        2024</p>
+                                </div>
+                            </div>
+                            <div
+                                class="absolute top-[280px] right-[10%] z-40 text-purple-400/60 rotate-12 pointer-events-none">
+                                <span class="material-symbols-outlined text-3xl">auto_awesome</span>
+                            </div>
+                            <div
+                                class="absolute top-[130px] left-[5%] z-0 text-orange-300/40 -rotate-12 pointer-events-none">
+                                <span class="font-handwriting text-2xl">Happy Day</span>
+                            </div>
+                        </div>
+                        <div class="mt-auto pt-6 border-t-2 border-dotted border-gray-300 relative">
+                            <div
+                                class="absolute -top-3 left-1/2 -translate-x-1/2 bg-white px-3 rounded-full border border-gray-100 shadow-sm">
+                                <span class="material-symbols-outlined text-gray-400 text-sm align-middle">cut</span>
+                            </div>
+                            <div class="flex flex-col items-center justify-center gap-2 text-center">
+                                <p class="font-handwriting text-gray-500 text-lg">记忆碎片整理</p>
+                                <div
+                                    class="bg-scrapbook-cream px-5 py-4 rounded-xl border border-scrapbook-brown/10 shadow-inner w-full">
+                                    <div class="flex justify-between items-center mb-1">
+                                        <span class="text-xs text-scrapbook-brown/60 font-display">保留照片</span>
+                                        <span class="text-xs text-scrapbook-brown/60 font-display">清理空间</span>
+                                    </div>
+                                    <div class="flex justify-between items-baseline">
+                                        <span class="text-2xl font-bold text-primary">5 <span
+                                                class="text-xs font-normal text-scrapbook-brown/70">张</span></span>
+                                        <span class="text-2xl font-bold text-primary">48 <span
+                                                class="text-xs font-normal text-scrapbook-brown/70">MB</span></span>
+                                    </div>
+                                </div>
+                                <p class="text-[10px] text-gray-400 mt-2 font-mono tracking-wider">GENERATED BY
+                                    COZYCLEAN</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div
+                class="bg-scrapbook-cream/95 backdrop-blur-md border-t border-scrapbook-accent/20 z-50 sticky bottom-0">
+                <div class="px-6 py-2">
+                    <div
+                        class="flex items-center justify-between bg-white/60 p-3 rounded-xl border border-scrapbook-accent/10 backdrop-blur-sm shadow-sm">
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="flex size-10 items-center justify-center rounded-full bg-scrapbook-accent/20 text-scrapbook-brown">
+                                <span class="material-symbols-outlined text-lg">calendar_today</span>
+                            </div>
+                            <div>
+                                <p class="text-xs text-scrapbook-brown/60">记录时间</p>
+                                <p class="text-sm font-bold text-scrapbook-brown">2024年3月15日</p>
+                            </div>
+                        </div>
+                        <button
+                            class="flex size-10 items-center justify-center rounded-full text-pink-500 hover:bg-pink-50 transition-colors">
+                            <span class="material-symbols-outlined fill-current">favorite</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between gap-3 px-6 pb-6 pt-2">
+                    <button
+                        class="flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform group w-[60px]">
+                        <div
+                            class="flex size-[52px] items-center justify-center rounded-xl bg-white border border-scrapbook-brown/10 text-scrapbook-brown shadow-sm group-hover:bg-scrapbook-accent/10 transition-colors">
+                            <span class="material-symbols-outlined text-[24px]">edit</span>
+                        </div>
+                        <span class="text-[10px] font-medium text-scrapbook-brown/80">编辑</span>
+                    </button>
+                    <button
+                        class="flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform group w-[60px]">
+                        <div
+                            class="flex size-[52px] items-center justify-center rounded-xl bg-white border border-scrapbook-brown/10 text-scrapbook-brown shadow-sm group-hover:bg-scrapbook-accent/10 transition-colors">
+                            <span class="material-symbols-outlined text-[24px]">home</span>
+                        </div>
+                        <span class="text-[10px] font-medium text-scrapbook-brown/80">返回首页</span>
+                    </button>
+                    <button
+                        class="flex-1 h-[52px] flex items-center justify-center gap-2 rounded-xl bg-scrapbook-brown text-scrapbook-cream shadow-md hover:bg-scrapbook-brown/90 active:scale-95 transition-all mb-[18px]">
+                        <span class="material-symbols-outlined text-[20px]">ios_share</span>
+                        <span class="text-sm font-medium">分享至社交媒体</span>
+                    </button>
+                    <button
+                        class="flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform group w-[60px]">
+                        <div
+                            class="flex size-[52px] items-center justify-center rounded-xl bg-white border border-scrapbook-brown/10 text-scrapbook-brown/80 shadow-sm group-hover:bg-red-50 group-hover:text-red-500 group-hover:border-red-200 transition-colors">
+                            <span class="material-symbols-outlined text-[24px]">delete</span>
+                        </div>
+                        <span class="text-[10px] font-medium text-scrapbook-brown/80">删除</span>
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+
+</html>

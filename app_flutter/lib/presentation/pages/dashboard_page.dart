@@ -5,6 +5,7 @@ import '../controllers/user_stats_controller.dart';
 import 'profile_page.dart';
 import 'package:cozy_clean/features/journal/presentation/pages/journal_page.dart';
 import 'package:cozy_clean/features/journal/application/controllers/journal_controller.dart';
+import 'package:cozy_clean/features/journal/presentation/widgets/poster_components.dart';
 
 class DashboardPage extends ConsumerStatefulWidget {
   const DashboardPage({super.key});
@@ -18,9 +19,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    // 基础骨架，手账风暖白底色
+    // 基础骨架，统一手账纸质纹理背景
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F1E5),
+      backgroundColor: ScrapbookColors.cream,
       bottomNavigationBar: _buildBottomNav(),
       body: IndexedStack(
         index: _currentIndex,
@@ -646,7 +647,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   Widget _buildBottomNav() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFFAF9F6),
+        color: ScrapbookColors.paperWhite.withOpacity(0.95), // 匹配原型的纸张稍白透明
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -668,12 +669,13 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         },
         elevation: 0,
         backgroundColor: Colors.transparent,
-        selectedItemColor: const Color(0xFFC75D56), // 主题红
-        unselectedItemColor: Colors.black38,
+        selectedItemColor: const Color(0xFF548A2E), // 使用原型的新 primary color (绿色)
+        unselectedItemColor:
+            const Color(0xFF73816A).withOpacity(0.5), // text-sub
         selectedLabelStyle:
-            const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            const TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
         unselectedLabelStyle:
-            const TextStyle(fontWeight: FontWeight.w500, fontSize: 12),
+            const TextStyle(fontWeight: FontWeight.w500, fontSize: 10),
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home_outlined),

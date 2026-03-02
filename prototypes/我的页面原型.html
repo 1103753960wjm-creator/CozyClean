@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>我的与数据中心 (样式统一版)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&amp;display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&amp;display=swap" rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#548a2e",
+                        "primary-light": "#7aa859",
+                        "primary-lighter": "#d6e5cc",
+                        "paper": "#F5F5DC",
+                        "paper-dark": "#e8e8d0",
+                        "background-dark": "#181e14",
+                        "neutral-warm": "#fcfaf8",
+                        "text-main": "#2c3328",
+                        "text-sub": "#73816a",
+                        "accent-gold": "#C6A664",
+                    },
+                    fontFamily: {
+                        "display": ["Plus Jakarta Sans", "Noto Sans SC", "sans-serif"],
+                        "serif": ["Noto Serif SC", "serif"],
+                        "hand": ["Ma Shan Zheng", "cursive"],
+                    },
+                    borderRadius: { "DEFAULT": "1rem", "lg": "1.5rem", "xl": "2rem", "2xl": "2.5rem", "full": "9999px" },
+                    boxShadow: {
+                        'soft': '0 4px 20px -2px rgba(84, 138, 46, 0.1)',
+                        'polaroid': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                        'paper': '2px 2px 5px rgba(0,0,0,0.05)',
+                    },
+                    backgroundImage: {
+                        'paper-texture': "url(\"data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%239C92AC' fill-opacity='0.03' fill-rule='evenodd'/%3E%3C/svg%3E\")"
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .polaroid-tilt-1 {
+            transform: rotate(-2deg);
+        }
+
+        .polaroid-tilt-2 {
+            transform: rotate(1deg);
+        }
+
+        .handwritten {
+            font-family: 'Ma Shan Zheng', cursive;
+        }
+    </style>
+    <style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+    <style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+
+<body
+    class="bg-paper dark:bg-background-dark font-display antialiased text-text-main dark:text-gray-100 min-h-screen flex flex-col bg-paper-texture">
+    <header
+        class="sticky top-0 z-50 bg-paper/90 dark:bg-background-dark/90 backdrop-blur-md border-b border-primary/5 px-4 pt-4 pb-3">
+        <div class="flex items-center justify-between">
+            <h1
+                class="text-xl font-bold tracking-tight text-center flex-1 text-text-main dark:text-gray-100 font-serif">
+                我的与数据中心</h1>
+            <button class="p-2 rounded-full hover:bg-primary/10 text-text-main dark:text-gray-100 transition-colors">
+                <span class="material-symbols-outlined !text-[24px]">notifications</span>
+            </button>
+        </div>
+    </header>
+    <main class="flex-1 overflow-y-auto w-full max-w-md mx-auto pb-24">
+        <section class="pt-6 pb-6 px-6 flex flex-col items-center justify-center relative">
+            <div
+                class="absolute top-10 left-4 w-12 h-12 border-t-2 border-l-2 border-primary/20 rounded-tl-xl pointer-events-none">
+            </div>
+            <div
+                class="absolute bottom-10 right-4 w-12 h-12 border-b-2 border-r-2 border-primary/20 rounded-br-xl pointer-events-none">
+            </div>
+            <div class="relative group cursor-pointer mb-4">
+                <div
+                    class="bg-white p-3 pb-8 shadow-polaroid transform rotate-[-3deg] transition-transform duration-300 group-hover:rotate-0 w-32 h-40 flex items-start justify-center">
+                    <div
+                        class="w-26 h-26 w-full aspect-square overflow-hidden bg-gray-100 filter brightness-110 contrast-[0.9]">
+                        <img alt="User Avatar" class="w-full h-full object-cover"
+                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuATJeNMr5PIzP8QTnFYjnCdEauDZoGd3_5lkTOPHl6EGQU-FqIauGt5FEFDMTbeQhjv9yl9Vr5wrVPKPV77PMWBOVsD7NU9XRoi00uashOvkt6oTHRyZfx9W7OUNhWEBmONSG5iwL3_Cngm1Y04cINYSIa1Pg094Mjzcss0Celg0T_SUeM7Np0vI3Ch6MIlwx8nPHDlubQIlWoQ_ieqku7mVin7ddQAw2e99H9hi3l0GbzrPwIgJqGI5ViXKyCALWUwrNOJ1jI9Cib0" />
+                    </div>
+                </div>
+                <div
+                    class="absolute -top-3 left-1/2 -translate-x-1/2 w-16 h-6 bg-yellow-100/80 rotate-2 shadow-sm z-10 opacity-80">
+                </div>
+            </div>
+            <div class="text-center">
+                <h2 class="text-2xl font-bold text-text-main dark:text-white font-serif tracking-wide">暖心妈妈</h2>
+                <p class="text-sm text-text-sub dark:text-gray-400 mt-1 font-serif italic">用爱记录每一个瞬间</p>
+                <div
+                    class="mt-3 inline-flex items-center gap-1 bg-white/60 dark:bg-white/10 px-3 py-1 rounded-full border border-primary/10">
+                    <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                    <span class="text-xs text-primary dark:text-primary-light font-medium">高级会员</span>
+                </div>
+            </div>
+        </section>
+        <section class="px-4 mb-6">
+            <div
+                class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+                <div class="flex items-center justify-between p-4 pb-2">
+                    <h3 class="font-serif text-lg font-bold text-text-main dark:text-gray-100 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-accent-gold">workspace_premium</span>
+                        荣誉殿堂
+                    </h3>
+                    <a class="text-xs text-text-sub dark:text-gray-400 flex items-center hover:text-primary transition-colors cursor-pointer"
+                        href="#">
+                        查看全部 <span class="material-symbols-outlined !text-[14px] ml-0.5">chevron_right</span>
+                    </a>
+                </div>
+                <div class="grid grid-cols-4 gap-2 p-4 pt-2">
+                    <div class="flex flex-col items-center gap-2 group cursor-pointer">
+                        <div
+                            class="w-14 h-14 rounded-full bg-[#E3F2FD] dark:bg-blue-900/30 flex items-center justify-center transition-transform group-hover:scale-105">
+                            <span class="material-symbols-outlined text-blue-500 !text-[28px]">verified_user</span>
+                        </div>
+                        <span
+                            class="text-[11px] font-medium text-text-sub text-center leading-tight line-clamp-1">记忆守护者</span>
+                    </div>
+                    <div class="flex flex-col items-center gap-2 group cursor-pointer">
+                        <div
+                            class="w-14 h-14 rounded-full bg-[#FFF3E0] dark:bg-orange-900/30 flex items-center justify-center transition-transform group-hover:scale-105">
+                            <span
+                                class="material-symbols-outlined text-orange-500 !text-[28px]">cleaning_services</span>
+                        </div>
+                        <span
+                            class="text-[11px] font-medium text-text-sub text-center leading-tight line-clamp-1">空间拯救者</span>
+                    </div>
+                    <div class="flex flex-col items-center gap-2 group cursor-pointer">
+                        <div
+                            class="w-14 h-14 rounded-full bg-[#F3E5F5] dark:bg-purple-900/30 flex items-center justify-center transition-transform group-hover:scale-105">
+                            <span class="material-symbols-outlined text-purple-500 !text-[28px]">auto_stories</span>
+                        </div>
+                        <span
+                            class="text-[11px] font-medium text-text-sub text-center leading-tight line-clamp-1">手账达人</span>
+                    </div>
+                    <div class="flex flex-col items-center gap-2 group cursor-pointer opacity-60">
+                        <div
+                            class="w-14 h-14 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center border border-dashed border-gray-300 dark:border-gray-600 transition-transform group-hover:scale-105">
+                            <span class="material-symbols-outlined text-gray-400 !text-[28px]">lock</span>
+                        </div>
+                        <span
+                            class="text-[11px] font-medium text-text-sub text-center leading-tight line-clamp-1">敬请期待</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section class="px-4 mb-8">
+            <div
+                class="relative bg-[url('https://www.transparenttextures.com/patterns/lined-paper-2.png')] bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm transform rotate-[-1deg] border border-gray-200 dark:border-gray-700">
+                <div class="absolute -top-2 left-1/2 -translate-x-1/2 w-24 h-5 bg-primary/20 opacity-70 rotate-1"></div>
+                <div class="grid grid-cols-3 divide-x divide-gray-200 dark:divide-gray-600">
+                    <div class="flex flex-col items-center px-2">
+                        <span class="handwritten text-3xl text-text-main dark:text-gray-100 mb-1">2,340</span>
+                        <span class="text-xs text-text-sub uppercase tracking-wider font-medium">累计清理 (张)</span>
+                    </div>
+                    <div class="flex flex-col items-center px-2">
+                        <span class="handwritten text-3xl text-primary mb-1">5.2<span
+                                class="text-lg ml-1">GB</span></span>
+                        <span class="text-xs text-text-sub uppercase tracking-wider font-medium">释放空间</span>
+                    </div>
+                    <div class="flex flex-col items-center px-2">
+                        <span class="handwritten text-3xl text-accent-gold mb-1">12</span>
+                        <span class="text-xs text-text-sub uppercase tracking-wider font-medium">手账创作 (本)</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section class="px-4">
+            <div
+                class="bg-white dark:bg-background-dark/50 rounded-2xl overflow-hidden shadow-soft border border-white/50 dark:border-white/5">
+                <a class="flex items-center justify-between p-4 border-b border-gray-50 dark:border-gray-800 hover:bg-neutral-warm dark:hover:bg-white/5 transition-colors group"
+                    href="#">
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="p-2 rounded-xl bg-green-50 text-primary dark:bg-primary/20 dark:text-primary-light group-hover:scale-110 transition-transform">
+                            <span class="material-symbols-outlined !text-[20px]">history_edu</span>
+                        </div>
+                        <span class="font-serif text-base text-text-main dark:text-gray-200">整理日志</span>
+                    </div>
+                    <span class="material-symbols-outlined text-gray-300 !text-[20px]">chevron_right</span>
+                </a>
+                <a class="flex items-center justify-between p-4 border-b border-gray-50 dark:border-gray-800 hover:bg-neutral-warm dark:hover:bg-white/5 transition-colors group"
+                    href="#">
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="p-2 rounded-xl bg-orange-50 text-orange-500 dark:bg-orange-500/20 dark:text-orange-300 group-hover:scale-110 transition-transform">
+                            <span class="material-symbols-outlined !text-[20px]">diamond</span>
+                        </div>
+                        <span class="font-serif text-base text-text-main dark:text-gray-200">会员中心</span>
+                    </div>
+                    <span class="material-symbols-outlined text-gray-300 !text-[20px]">chevron_right</span>
+                </a>
+                <a class="flex items-center justify-between p-4 border-b border-gray-50 dark:border-gray-800 hover:bg-neutral-warm dark:hover:bg-white/5 transition-colors group"
+                    href="#">
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="p-2 rounded-xl bg-blue-50 text-blue-500 dark:bg-blue-500/20 dark:text-blue-300 group-hover:scale-110 transition-transform">
+                            <span class="material-symbols-outlined !text-[20px]">cloud_sync</span>
+                        </div>
+                        <span class="font-serif text-base text-text-main dark:text-gray-200">数据同步</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-text-sub">已同步</span>
+                        <span class="material-symbols-outlined text-gray-300 !text-[20px]">chevron_right</span>
+                    </div>
+                </a>
+                <a class="flex items-center justify-between p-4 hover:bg-neutral-warm dark:hover:bg-white/5 transition-colors group"
+                    href="#">
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="p-2 rounded-xl bg-gray-50 text-gray-500 dark:bg-gray-700/50 dark:text-gray-400 group-hover:scale-110 transition-transform">
+                            <span class="material-symbols-outlined !text-[20px]">settings</span>
+                        </div>
+                        <span class="font-serif text-base text-text-main dark:text-gray-200">设置</span>
+                    </div>
+                    <span class="material-symbols-outlined text-gray-300 !text-[20px]">chevron_right</span>
+                </a>
+            </div>
+        </section>
+        <div class="mt-8 mb-4 text-center">
+            <p class="text-[10px] text-text-sub/50 uppercase tracking-widest">CozyClean v2.0.4</p>
+        </div>
+        <div class="h-8"></div>
+    </main>
+    <nav
+        class="fixed bottom-0 w-full z-50 bg-paper/95 dark:bg-background-dark/95 backdrop-blur-lg border-t border-primary/10 pb-safe pt-2">
+        <div class="flex justify-around items-end h-16 pb-2">
+            <a class="group flex flex-1 flex-col items-center justify-center gap-1 text-text-sub dark:text-gray-400 hover:text-primary transition-colors"
+                href="#">
+                <div
+                    class="relative flex items-center justify-center rounded-xl p-1 transition-colors group-hover:bg-primary/5">
+                    <span class="material-symbols-outlined !text-[26px]">home</span>
+                </div>
+                <span class="text-[10px] font-medium tracking-wide">首页</span>
+            </a>
+            <a class="group flex flex-1 flex-col items-center justify-center gap-1 text-text-sub dark:text-gray-400 hover:text-primary transition-colors"
+                href="#">
+                <div
+                    class="relative flex items-center justify-center rounded-xl p-1 transition-colors group-hover:bg-primary/5">
+                    <span class="material-symbols-outlined !text-[26px]">book_2</span>
+                </div>
+                <span class="text-[10px] font-medium tracking-wide">手账</span>
+            </a>
+            <a class="group flex flex-1 flex-col items-center justify-center gap-1 text-primary dark:text-primary-light"
+                href="#">
+                <div class="relative flex items-center justify-center rounded-xl p-1 bg-primary/10">
+                    <span class="material-symbols-outlined !text-[26px] fill-current"
+                        style="font-variation-settings: 'FILL' 1;">person</span>
+                </div>
+                <span class="text-[10px] font-bold tracking-wide">我的</span>
+            </a>
+        </div>
+        <div class="h-4 bg-transparent w-full"></div>
+    </nav>
+
+</body>
+
+</html>

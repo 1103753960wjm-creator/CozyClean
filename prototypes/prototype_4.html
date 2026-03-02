@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&amp;family=Noto+Serif+SC:wght@300;400;500;600;700&amp;family=Zhi+Mang+Xing&amp;family=Ma+Shan+Zheng&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ec5b13",
+                        "background-light": "#f8f6f6",
+                        "background-dark": "#221610",
+                        "scrapbook-cream": "#F5F5DC",
+                        "scrapbook-brown": "#5D4037",
+                        "scrapbook-accent": "#D4A373"
+                    },
+                    fontFamily: {
+                        "display": ["Public Sans", "Noto Serif SC", "serif"],
+                        "handwriting": ["Zhi Mang+Xing", "cursive"],
+                        "serif-sc": ["Noto Serif SC", "serif"],
+                        "elegant-hand": ["Ma Shan Zheng", "cursive"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+    <style>
+        .dotted-bg {
+            background-image: radial-gradient(#d1d1b2 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .washi-tape {
+            background: rgba(236, 91, 19, 0.3);
+            box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+            transform: rotate(-3deg);
+        }
+
+        .washi-tape-green {
+            background: rgba(101, 163, 13, 0.3);
+            box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .washi-tape-blue {
+            background: rgba(56, 189, 248, 0.3);
+            box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .washi-tape-pink {
+            background: rgba(244, 114, 182, 0.3);
+            box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #F5F5DC;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #D4A373;
+            border-radius: 4px;
+        }
+    </style>
+    <style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+    <style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+
+<body class="bg-background-light dark:bg-background-dark font-display text-scrapbook-brown">
+    <div
+        class="relative flex min-h-screen w-full flex-col max-w-md mx-auto bg-scrapbook-cream shadow-2xl overflow-x-hidden dotted-bg">
+        <nav
+            class="flex items-center p-4 justify-between bg-scrapbook-cream/95 backdrop-blur-sm sticky top-0 z-50 border-b border-scrapbook-accent/20">
+            <button
+                class="flex size-10 items-center justify-center rounded-full hover:bg-scrapbook-accent/10 transition-colors">
+                <span class="material-symbols-outlined text-scrapbook-brown">arrow_back_ios_new</span>
+            </button>
+            <h2 class="text-scrapbook-brown text-lg font-bold leading-tight tracking-tight">四张照片海报模板</h2>
+            <button
+                class="flex size-10 items-center justify-center rounded-full hover:bg-scrapbook-accent/10 transition-colors">
+                <span class="material-symbols-outlined text-scrapbook-brown">share</span>
+            </button>
+        </nav>
+        <main class="flex-1 overflow-y-auto">
+            <div class="px-6 pt-6 pb-2">
+                <div
+                    class="relative w-full bg-white shadow-xl rounded-sm p-6 overflow-hidden border border-scrapbook-accent/20 min-h-[750px]">
+                    <div class="absolute -top-2 -left-6 w-32 h-8 washi-tape z-20 opacity-80"></div>
+                    <div
+                        class="absolute top-[30%] -right-4 w-24 h-6 bg-green-700/20 rotate-45 z-0 rounded-full blur-xl opacity-30">
+                    </div>
+                    <div class="absolute bottom-[20%] -left-4 w-32 h-32 bg-yellow-500/10 rounded-full blur-2xl z-0">
+                    </div>
+                    <div
+                        class="absolute -bottom-2 -right-6 w-32 h-8 washi-tape z-20 opacity-60 rotate-12 bg-scrapbook-accent/40">
+                    </div>
+                    <div class="relative h-full w-full flex flex-col gap-6 z-10">
+                        <div class="text-center py-2 space-y-2 border-b border-dashed border-gray-200 pb-4">
+                            <h1
+                                class="font-elegant-hand font-normal text-2xl text-scrapbook-brown leading-relaxed pt-2 tracking-widest opacity-90">
+                                春日野餐记</h1>
+                            <p class="font-handwriting text-xl text-scrapbook-accent/90 px-4">"四种不同的心情，拼凑出今天的完美..."</p>
+                        </div>
+                        <div class="relative px-1 pb-4 grid grid-cols-2 gap-x-2 gap-y-12 mt-4">
+                            <div
+                                class="relative transform rotate-[-3deg] hover:rotate-0 transition-transform duration-300 z-10">
+                                <div
+                                    class="absolute -top-3 left-[20%] w-12 h-4 washi-tape-green rotate-[-5deg] z-20 opacity-90">
+                                </div>
+                                <div class="bg-white p-2 pb-6 shadow-md border border-slate-100">
+                                    <div class="w-full aspect-[4/5] bg-cover bg-center grayscale-[10%]"
+                                        style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBvyTNzX84QW04IicKngKABUzAaoSvoPJl-dCjlTy0pd8RwD8JnQsTbGPd6Mv86K_MwOMucQmBI26BLqcrPmWyKzbShvimIY1zGrOzAYW7kBaW_YZM9LC82SeM82axbcMf9ZE5bEFrLtyKv_Wts8uhI4sFcDjbqFAWkxYUSF-lmcVj4OzjRqXYsy5cmJ-N_HooSMIB6lSAyjzDyUWjGAEU7QcBBjLJHmJHExuHRPyKRTnCadKqUvc5R62GC5Hwo4Vlpc3KlmKkVQfXJ");'>
+                                    </div>
+                                    <p class="font-handwriting text-sm mt-2 text-center text-gray-600">清晨露水</p>
+                                </div>
+                                <div class="absolute -bottom-4 -left-2 text-primary/10 rotate-[-10deg]">
+                                    <span class="material-symbols-outlined text-3xl">eco</span>
+                                </div>
+                            </div>
+                            <div
+                                class="relative transform rotate-[2deg] hover:rotate-0 transition-transform duration-300 z-20 mt-6">
+                                <div
+                                    class="absolute -top-3 right-[20%] w-12 h-4 washi-tape-pink rotate-[5deg] z-20 opacity-90">
+                                </div>
+                                <div class="bg-white p-2 pb-6 shadow-lg border border-slate-100">
+                                    <div class="w-full aspect-[4/5] bg-cover bg-center sepia-[20%]"
+                                        style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuB4S6yB2wKSCYlgfrKtQcrZhMzZVtA7vGGqzStwAgc2F6jKkOJqDjEaanARSz6Ip8GotmBb3NiG14j--HV3UYY6XbEVYEt-dhbw-Qcb1JlW3NrLXkla9hZoDLi_fiGmWuQrcR0HIlZvH6S9h2f3r6jv-vB0cOcatovGDEgeh_5FjZKZltuUkkF42dVfB4ydKklMCk_N5GMos9ULX-7fFLOKiXtSHUyPp_8bBpwkr-kQ-8Mc5otZBLBqajL6p26uc5nPEaUjx7ZnGRyS");'>
+                                    </div>
+                                    <p class="font-handwriting text-sm mt-2 text-center text-gray-600">午后阳光</p>
+                                </div>
+                                <span
+                                    class="absolute -top-4 -right-2 material-symbols-outlined text-yellow-400 text-xl drop-shadow-sm rotate-12 animate-pulse">wb_sunny</span>
+                            </div>
+                            <div
+                                class="relative transform rotate-[4deg] hover:rotate-0 transition-transform duration-300 z-10 -mt-2">
+                                <div
+                                    class="absolute -top-3 left-[15%] w-12 h-4 washi-tape-blue rotate-[2deg] z-20 opacity-90">
+                                </div>
+                                <div class="bg-white p-2 pb-6 shadow-md border border-slate-100">
+                                    <div class="w-full aspect-[4/5] bg-cover bg-center contrast-110"
+                                        style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAbvKqDnWYL69OBKfKv43uO4AVIH0k89TwhXNT15aBa-Gx7Umn3SuS5tqFsEvX8YUSd0YcxL4JqaJdVvk-8VivE9knkJz_vChjMr_hP4GroDFZOjfOiD2_cY434QUlVuJNMqefl3LQpr7wIohIsrsEpEVmUbGzi2cM3SsvZWliFO6A-wmGQkPf5cheLb-i48O7iY3pVANh-RxLo6OwMWbMMV6KKGYhyTxHKitXJlUJZWXyIBU_p0D0t5hwXI0zcv5Xu7VBGviETLU88");'>
+                                    </div>
+                                    <p class="font-handwriting text-sm mt-2 text-center text-gray-600">快乐时刻</p>
+                                </div>
+                            </div>
+                            <div
+                                class="relative transform rotate-[-2deg] hover:rotate-0 transition-transform duration-300 z-20 mt-4">
+                                <div
+                                    class="absolute -top-3 right-[25%] w-12 h-4 washi-tape bg-yellow-400/30 rotate-[-3deg] z-20 opacity-90">
+                                </div>
+                                <div class="bg-white p-2 pb-6 shadow-lg border border-slate-100">
+                                    <div class="w-full aspect-[4/5] bg-cover bg-center"
+                                        style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDsI1cXMnTWHM1b_DoFz4UAOss_5DUTNc_A5pSI8JuqxF3_x4fkpR_8NE1oY0zPDD83CWQl87he-aYQb0vWaqMZwf5PsjmgR1RdB1xU4NZC6LM_gRklG40Yle_j0wjkkt482VHB9RxRzsVV8ULB_GXQ3nqnojqgp4Fp80Riea7DOlH6zlG1EKePfB43d-a_5ywV7ZR062YPd0UH_bia6_RBTy_Cbg-R5maqsBf1ah4dXtwyxRaNmchbfV37jHt5LWBihGGkWu2u1i9r");'>
+                                    </div>
+                                    <p class="font-handwriting text-sm mt-2 text-center text-gray-600">美好回忆</p>
+                                </div>
+                                <div class="absolute -right-3 bottom-10 w-16 h-16 opacity-10 rotate-12">
+                                    <span class="material-symbols-outlined text-6xl">local_florist</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-auto pt-6 border-t-2 border-dotted border-gray-300 relative">
+                            <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-white px-2">
+                                <span class="material-symbols-outlined text-gray-400">content_cut</span>
+                            </div>
+                            <div class="flex flex-col items-center justify-center gap-3 text-center w-full px-2">
+                                <div
+                                    class="w-full bg-scrapbook-cream/50 rounded-lg p-3 border border-dashed border-scrapbook-brown/20 flex items-center justify-between gap-3">
+                                    <div class="flex items-center gap-2">
+                                        <div
+                                            class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                                            <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
+                                        </div>
+                                        <div class="text-left">
+                                            <p
+                                                class="text-[10px] text-scrapbook-brown/60 uppercase tracking-wider font-bold">
+                                                CozyClean</p>
+                                            <p class="text-xs font-bold text-scrapbook-brown">记忆碎片整理</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-3 text-right">
+                                        <div class="flex flex-col items-end">
+                                            <span class="text-[10px] text-gray-500">保留照片</span>
+                                            <span class="text-sm font-bold text-scrapbook-brown">4 张</span>
+                                        </div>
+                                        <div class="w-px h-6 bg-gray-300"></div>
+                                        <div class="flex flex-col items-end">
+                                            <span class="text-[10px] text-gray-500">清理空间</span>
+                                            <span class="text-sm font-bold text-primary">12.5 MB</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 pb-6">
+                <div
+                    class="mt-4 flex items-center justify-between bg-white/60 p-4 rounded-xl border border-scrapbook-accent/10 backdrop-blur-sm shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="flex size-10 items-center justify-center rounded-full bg-scrapbook-accent/20 text-scrapbook-brown">
+                            <span class="material-symbols-outlined text-lg">calendar_today</span>
+                        </div>
+                        <div>
+                            <p class="text-xs text-scrapbook-brown/60">记录时间</p>
+                            <p class="text-sm font-bold text-scrapbook-brown">2024年3月15日</p>
+                        </div>
+                    </div>
+                    <div
+                        class="flex items-center gap-1 bg-white/50 px-3 py-1.5 rounded-full border border-scrapbook-brown/5 shadow-sm">
+                        <span class="material-symbols-outlined text-xs text-primary">location_on</span>
+                        <span class="text-xs text-gray-600 font-medium">CozyClean</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+        <div
+            class="bg-scrapbook-cream/95 backdrop-blur-md border-t border-scrapbook-accent/20 pb-6 z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+            <div class="flex items-center gap-3 px-6 pt-4">
+                <button
+                    class="flex-1 flex flex-col items-center justify-center gap-1 h-14 bg-white border border-scrapbook-brown/10 text-scrapbook-brown rounded-2xl hover:bg-scrapbook-accent/5 transition-colors shadow-sm">
+                    <span class="material-symbols-outlined text-[22px]">edit</span>
+                    <span class="text-[10px] font-medium">编辑</span>
+                </button>
+                <button
+                    class="flex-1 flex flex-col items-center justify-center gap-1 h-14 bg-white border border-scrapbook-brown/10 text-scrapbook-brown rounded-2xl hover:bg-scrapbook-accent/5 transition-colors shadow-sm">
+                    <span class="material-symbols-outlined text-[22px]">home</span>
+                    <span class="text-[10px] font-medium">返回首页</span>
+                </button>
+                <button
+                    class="flex-1 flex flex-col items-center justify-center gap-1 h-14 bg-white border border-red-100 text-scrapbook-brown/80 rounded-2xl hover:bg-red-50 hover:text-red-500 transition-colors shadow-sm">
+                    <span class="material-symbols-outlined text-[22px]">delete</span>
+                    <span class="text-[10px] font-medium">删除</span>
+                </button>
+            </div>
+            <div class="px-6 pt-3">
+                <button
+                    class="w-full flex items-center justify-center gap-2 h-12 bg-scrapbook-brown text-scrapbook-cream rounded-2xl font-bold shadow-lg shadow-scrapbook-brown/20 active:scale-[0.98] transition-all hover:bg-scrapbook-brown/90">
+                    <span class="material-symbols-outlined text-xl">ios_share</span>
+                    <span class="">分享至社交媒体</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>
