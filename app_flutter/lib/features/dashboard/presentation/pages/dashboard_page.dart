@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cozy_clean/features/blitz/presentation/pages/blitz_page.dart';
-import '../controllers/user_stats_controller.dart';
-import 'profile_page.dart';
+import 'package:cozy_clean/features/profile/application/controllers/user_stats_controller.dart';
+import 'package:cozy_clean/features/profile/presentation/pages/profile_page.dart';
 import 'package:cozy_clean/features/journal/presentation/pages/journal_page.dart';
 import 'package:cozy_clean/features/journal/application/controllers/journal_controller.dart';
 import 'package:cozy_clean/features/journal/presentation/widgets/poster_components.dart';
+
+import 'package:cozy_clean/features/blitz/domain/repositories/onboarding_repository.dart';
+import 'package:cozy_clean/features/onboarding/presentation/pages/intro_swiper_page.dart';
 
 class DashboardPage extends ConsumerStatefulWidget {
   const DashboardPage({super.key});
@@ -16,6 +19,23 @@ class DashboardPage extends ConsumerStatefulWidget {
 
 class _DashboardPageState extends ConsumerState<DashboardPage> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkOnboarding();
+  }
+
+  void _checkOnboarding() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final onboardingRepo = ref.read(onboardingRepositoryProvider);
+      if (!onboardingRepo.hasSeenIntroSwiper()) {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const IntroSwiperPage()),
+        );
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

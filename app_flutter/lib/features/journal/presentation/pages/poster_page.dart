@@ -11,9 +11,11 @@
 ///   5. 保存到手账历史（Journals 表）
 library;
 
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -24,11 +26,10 @@ import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
-import 'package:cozy_clean/features/journal/presentation/widgets/poster_components.dart';
-import 'package:cozy_clean/features/blitz/data/providers/blitz_data_providers.dart';
-import 'package:cozy_clean/features/journal/data/repositories/journal_repository.dart';
-import 'package:cozy_clean/features/journal/presentation/pages/journal_detail_page.dart';
 import 'package:cozy_clean/data/local/app_database.dart';
+import 'package:cozy_clean/features/journal/presentation/pages/journal_detail_page.dart';
+import 'package:cozy_clean/features/journal/presentation/widgets/poster_components.dart';
+import 'package:cozy_clean/features/blitz/data/providers/blitz_data_providers.dart'; // 导入 database provider
 
 /// 手账海报生成页
 class PosterPage extends ConsumerStatefulWidget {
@@ -52,8 +53,8 @@ class _PosterPageState extends ConsumerState<PosterPage> {
     super.initState();
     _titleController.text = 'COZYCLEAN 治愈记忆瞬间';
     // 输入时实时刷新海报预览和字数提示
-    _titleController.addListener(() => setState(() {}));
-    _feelingController.addListener(() => setState(() {}));
+    _titleController.addListener(_handleStateChange);
+    _feelingController.addListener(_handleStateChange);
   }
 
   @override
@@ -71,15 +72,22 @@ class _PosterPageState extends ConsumerState<PosterPage> {
   ///
   /// 返回保存的 [Journal] 记录，用于跳转详情页。
   Future<Journal?> _generateAndSave() async {
+    // 渲染海报前，先移除控制器监听器，防止渲染过程中的异步 UI 变更导致 RepaintBoundary 失效或图片重新加载
+    _titleController.removeListener(_handleStateChange);
+    _feelingController.removeListener(_handleStateChange);
+
     try {
       setState(() => _isGenerating = true);
+      // 给 UI 一个短暂的稳定窗口，确保图片加载完全，防止捕获到占位符
+      await Future.delayed(const Duration(milliseconds: 300));
 
       // 1. 捕获 RepaintBoundary
       final boundary = _repaintKey.currentContext?.findRenderObject()
           as RenderRepaintBoundary?;
       if (boundary == null) return null;
 
-      final image = await boundary.toImage(pixelRatio: 3.0);
+      // 2.0 倍率足以产生清晰的 800px 左右长图，同时显著降低内存压力
+      final ui.Image image = await boundary.toImage(pixelRatio: 2.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) return null;
 
@@ -98,24 +106,36 @@ class _PosterPageState extends ConsumerState<PosterPage> {
 
       // 3. 保存到数据库
       final db = ref.read(appDatabaseProvider);
-      final repo = JournalRepository(db);
-      final id = await repo.saveJournal(
-        title: _titleController.text,
-        photoAssetIds: widget.photos.map((p) => p.id).toList(),
-        posterFilePath: file.path,
-        feeling: _feelingController.text,
+      final companion = JournalsCompanion.insert(
+        title: _titleController.text.isEmpty
+            ? 'COZYCLEAN 治愈记忆瞬间'
+            : _titleController.text,
+        photoIds: jsonEncode(widget.photos.map((p) => p.id).toList()),
+        posterPath: file.path,
+        feeling: Value(
+            _feelingController.text.isEmpty ? null : _feelingController.text),
       );
 
-      // 4. 查询刚保存的记录
-      final journal = await repo.getJournalById(id);
+      final id = await db.into(db.journals).insert(companion);
 
-      setState(() => _isGenerating = false);
-      return journal;
+      // 查询刚插入的记录
+      return await (db.select(db.journals)..where((t) => t.id.equals(id)))
+          .getSingle();
     } catch (e) {
-      setState(() => _isGenerating = false);
-      debugPrint('[PosterPage] 海报生成失败: $e');
+      debugPrint('海报生成失败: $e');
       return null;
+    } finally {
+      // 恢复监听
+      if (mounted) {
+        _titleController.addListener(_handleStateChange);
+        _feelingController.addListener(_handleStateChange);
+        setState(() => _isGenerating = false);
+      }
     }
+  }
+
+  void _handleStateChange() {
+    if (mounted) setState(() {});
   }
 
   /// 保存海报并跳转详情页
@@ -154,28 +174,37 @@ class _PosterPageState extends ConsumerState<PosterPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ScrapbookColors.cream,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_rounded,
-            color: Color(0xFF4A4238),
-          ),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text(
-          '手账海报',
-          style: TextStyle(
-            color: Color(0xFF4A4238),
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        centerTitle: true,
-      ),
       body: Column(
         children: [
+          // 自定义顶部导航栏 (使用 Stack 确保标题绝对居中，且不因左右按钮宽度产生偏移或挤压)
+          Container(
+            height: 56,
+            margin: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Positioned(
+                  left: 8,
+                  child: IconButton(
+                    icon: const Icon(
+                      Icons.arrow_back_ios_rounded,
+                      color: Color(0xFF4A4238),
+                      size: 20,
+                    ),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ),
+                const Text(
+                  '手账海报',
+                  style: TextStyle(
+                    color: Color(0xFF4A4238),
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
           // 标题编辑区
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -203,7 +232,7 @@ class _PosterPageState extends ConsumerState<PosterPage> {
                     decoration: InputDecoration(
                       hintText: '点击自定义标题...',
                       hintStyle: TextStyle(
-                        color: Colors.black.withValues(alpha: 0.3),
+                        color: Colors.black.withOpacity(0.3),
                         fontStyle: FontStyle.italic,
                       ),
                       border: InputBorder.none,
@@ -260,7 +289,7 @@ class _PosterPageState extends ConsumerState<PosterPage> {
                     decoration: InputDecoration(
                       hintText: '写下此刻的感受...',
                       hintStyle: TextStyle(
-                        color: Colors.black.withValues(alpha: 0.25),
+                        color: Colors.black.withOpacity(0.25),
                         fontStyle: FontStyle.italic,
                       ),
                       border: InputBorder.none,
@@ -283,7 +312,7 @@ class _PosterPageState extends ConsumerState<PosterPage> {
                         fontSize: 10,
                         color: _feelingController.text.length >= 40
                             ? const Color(0xFFC75D56)
-                            : Colors.black.withValues(alpha: 0.25),
+                            : Colors.black.withOpacity(0.25),
                       ),
                     ),
                   ),
@@ -332,9 +361,9 @@ class _PosterPageState extends ConsumerState<PosterPage> {
         border: Border.all(color: const Color(0xFFE5DFD3), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 20,
-            offset: const Offset(0, 8),
+            offset: const Offset(0, -4),
           ),
         ],
       ),
@@ -367,7 +396,7 @@ class _PosterPageState extends ConsumerState<PosterPage> {
             DateFormat('yyyy.MM.dd').format(DateTime.now()),
             style: TextStyle(
               fontSize: 11,
-              color: Colors.black.withValues(alpha: 0.35),
+              color: Colors.black.withOpacity(0.35),
               letterSpacing: 2,
             ),
           ),
@@ -378,10 +407,10 @@ class _PosterPageState extends ConsumerState<PosterPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.5),
+                color: Colors.white.withOpacity(0.5),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: const Color(0xFFE5DFD3).withValues(alpha: 0.6),
+                  color: const Color(0xFFE5DFD3).withOpacity(0.6),
                 ),
               ),
               child: Text(
@@ -389,7 +418,7 @@ class _PosterPageState extends ConsumerState<PosterPage> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13,
-                  color: const Color(0xFF4A4238).withValues(alpha: 0.7),
+                  color: const Color(0xFF4A4238).withOpacity(0.7),
                   height: 1.8,
                   fontStyle: FontStyle.italic,
                   letterSpacing: 0.5,
@@ -476,12 +505,13 @@ class _PosterPageState extends ConsumerState<PosterPage> {
     // 模拟占位：张数 * 4.5 MB
     final savedMB = (count * 4.5).toStringAsFixed(1);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      // 减小内边距，从 20 降至 12，防止窄屏溢出
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.5),
+        color: Colors.white.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: ScrapbookColors.brown.withOpacity(0.2),
+          color: ScrapbookColors.brown.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
@@ -490,29 +520,29 @@ class _PosterPageState extends ConsumerState<PosterPage> {
         children: [
           Icon(
             Icons.inventory_2_outlined,
-            size: 16,
-            color: ScrapbookColors.brown.withOpacity(0.8),
+            size: 14, // 略微缩小图标
+            color: ScrapbookColors.brown.withValues(alpha: 0.8),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '珍藏 $count 张', // 精简文字
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: ScrapbookColors.brown.withValues(alpha: 0.9),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            width: 1,
+            height: 10,
+            color: ScrapbookColors.brown.withValues(alpha: 0.3),
           ),
           const SizedBox(width: 8),
           Text(
-            '珍藏照片 $count 张',
+            '释放 $savedMB MB', // 精简文字
             style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: ScrapbookColors.brown.withOpacity(0.9),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Container(
-            width: 1,
-            height: 12,
-            color: ScrapbookColors.brown.withOpacity(0.3),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            '释放空间 $savedMB MB',
-            style: TextStyle(
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: FontWeight.w600,
               color: ScrapbookColors.greenAccent,
             ),
@@ -596,14 +626,13 @@ class _PosterPageState extends ConsumerState<PosterPage> {
     }
   }
 
-  /// 【完全定制方案】提供基础的照片尺寸
   Widget _buildRawPhoto(AssetEntity photo, double width, double height) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(2),
       child: AssetEntityImage(
         photo,
         isOriginal: false,
-        thumbnailSize: const ThumbnailSize(500, 500),
+        thumbnailSize: const ThumbnailSize(400, 400), // 降低尺寸，减少渲染海报长图时的总显存开销
         fit: BoxFit.cover,
         width: width,
         height: height,
@@ -930,12 +959,12 @@ class _PosterPageState extends ConsumerState<PosterPage> {
             .withValues(alpha: 0.95), // bg-scrapbook-cream/95
         border: Border(
           top: BorderSide(
-            color: ScrapbookColors.brown.withOpacity(0.05), // border-t
+            color: ScrapbookColors.brown.withValues(alpha: 0.05), // border-t
           ),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 20,
             offset: const Offset(0, -4),
           ),
@@ -986,7 +1015,7 @@ class _PosterPageState extends ConsumerState<PosterPage> {
                     boxShadow: [
                       if (!_isGenerating)
                         BoxShadow(
-                          color: ScrapbookColors.brown.withOpacity(0.2),
+                          color: ScrapbookColors.brown.withValues(alpha: 0.2),
                           blurRadius: 15,
                           offset: const Offset(0, 4),
                         ),

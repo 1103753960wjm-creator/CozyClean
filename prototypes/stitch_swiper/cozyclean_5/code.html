@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CozyClean Onboarding Step 2</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=Noto+Sans+SC:wght@400;500;700&amp;family=Ma+Shan+Zheng&amp;display=swap" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#8B5E3C","secondary": "#A67B5B",
+                        "accent": "#D2B48C",
+                        "background-light": "#F5F5DC","background-dark": "#2C241B","paper": "#FDFBF7","text-main": "#4A3B32",
+                        "text-muted": "#8C7A6B",
+                        "stamp-red": "#D9534F",
+                        "stamp-green": "#5CB85C",
+                    },
+                    fontFamily: {
+                        "display": ["Plus Jakarta Sans", "Noto Sans SC", "sans-serif"],
+                        "body": ["Noto Sans SC", "sans-serif"],
+                        "handwritten": ["Ma Shan Zheng", "cursive"],
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.75rem", 
+                        "lg": "1.5rem", 
+                        "xl": "2rem", 
+                        "full": "9999px"
+                    },
+                    boxShadow: {
+                        "paper": "0 4px 6px -1px rgba(139, 94, 60, 0.1), 0 2px 4px -1px rgba(139, 94, 60, 0.06)",
+                        "polaroid": "0 10px 15px -3px rgba(139, 94, 60, 0.1), 0 4px 6px -2px rgba(139, 94, 60, 0.05)",
+                        "card": "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .bg-texture {
+            background-image: radial-gradient(#D2B48C 1px, transparent 1px);
+            background-size: 20px 20px;
+            opacity: 0.3;
+        }
+        .stamp-border {
+            border: 2px solid currentColor;
+            mask-image: url("data:image/svg+xml,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.5' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.5'/%3E%3C/svg%3E");
+        }
+        .hand-arrow-path {
+            stroke-dasharray: 10;
+            animation: dash 30s linear infinite;
+        }
+        @keyframes dash {
+            to {
+                stroke-dashoffset: 1000;
+            }
+        }
+    </style>
+<style>
+    body {
+      min-height: max(667px, 100dvh);
+    }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-body text-text-main dark:text-[#E8DCC4] min-h-screen flex flex-col overflow-hidden transition-colors duration-300">
+<div class="fixed inset-0 bg-texture pointer-events-none z-0"></div>
+<main class="relative z-10 flex-1 flex flex-col h-full px-6 pt-8 pb-8">
+<div class="flex justify-between items-center mb-8">
+<div class="flex gap-1.5">
+<div class="w-8 h-1.5 rounded-full bg-primary/20 dark:bg-white/20"></div>
+<div class="w-8 h-1.5 rounded-full bg-primary dark:bg-[#D2B48C]"></div>
+<div class="w-8 h-1.5 rounded-full bg-primary/20 dark:bg-white/20"></div>
+<div class="w-8 h-1.5 rounded-full bg-primary/20 dark:bg-white/20"></div>
+<div class="w-8 h-1.5 rounded-full bg-primary/20 dark:bg-white/20"></div>
+</div>
+<div class="font-handwritten text-xl text-text-muted dark:text-[#A69B8B]">2/5</div>
+</div>
+<div class="flex-1 flex flex-col justify-center items-center relative w-full max-w-sm mx-auto">
+<div class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-20 flex flex-col items-center opacity-80 rotate-[-12deg]">
+<div class="w-16 h-16 rounded-full border-4 border-stamp-red flex items-center justify-center bg-white/50 backdrop-blur-sm shadow-sm" style="border-style: dashed;">
+<span class="material-symbols-outlined text-stamp-red text-3xl font-bold">delete</span>
+</div>
+<span class="text-stamp-red font-handwritten text-lg mt-1 font-bold tracking-widest">删除</span>
+</div>
+<div class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-20 flex flex-col items-center opacity-80 rotate-[12deg]">
+<div class="w-16 h-16 rounded-full border-4 border-stamp-green flex items-center justify-center bg-white/50 backdrop-blur-sm shadow-sm" style="border-style: dashed;">
+<span class="material-symbols-outlined text-stamp-green text-3xl font-bold">favorite</span>
+</div>
+<span class="text-stamp-green font-handwritten text-lg mt-1 font-bold tracking-widest">珍藏</span>
+</div>
+<div class="relative w-64 bg-paper dark:bg-[#3E3429] p-4 pb-12 shadow-card transform rotate-2 transition-transform duration-500 hover:rotate-0 z-10 border border-white/50">
+<div class="absolute -top-3 left-1/2 -translate-x-1/2 w-24 h-8 bg-white/40 backdrop-blur-sm shadow-sm rotate-1 z-20"></div>
+<div class="w-full aspect-[4/5] bg-gray-100 dark:bg-[#2C241B] mb-4 relative overflow-hidden flex items-center justify-center">
+<div class="absolute inset-0 opacity-10" style="background-image: url('data:image/svg+xml,%3Csvg width=\'20\' height=\'20\' viewBox=\'0 0 20 20\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'%23000000\' fill-opacity=\'1\' fill-rule=\'evenodd\'%3E%3Ccircle cx=\'3\' cy=\'3\' r=\'3\'/%3E%3Ccircle cx=\'13\' cy=\'13\' r=\'3\'/%3E%3C/g%3E%3C/svg%3E');"></div>
+<div class="relative w-32 h-32 text-text-muted/60 dark:text-white/40">
+<svg class="w-full h-full drop-shadow-md" fill="currentColor" viewBox="0 0 24 24">
+<path d="M21.5,12.5L20.1,19.4C19.9,20.4 19,21 18,21H10.5C9.8,21 9.2,20.6 8.9,20L5.3,12.7C5.1,12.3 5.3,11.9 5.7,11.7L6.6,11.3C7,11.1 7.4,11.2 7.7,11.6L9,13.7V3C9,2.4 9.4,2 10,2C10.6,2 11,2.4 11,3V10.5H12V4C12,3.4 12.4,3 13,3C13.6,3 14,3.4 14,4V10.5H15V5C15,4.4 15.4,4 16,4C16.6,4 17,4.4 17,5V10.5H18V6C18,5.4 18.4,5 19,5C19.6,5 20,5.4 20,6V12.5H21.5Z"></path>
+</svg>
+</div>
+<div class="absolute inset-0 flex items-center justify-between px-2">
+<span class="material-symbols-outlined text-4xl text-text-main/40 dark:text-white/40 animate-pulse">arrow_back</span>
+<span class="material-symbols-outlined text-4xl text-text-main/40 dark:text-white/40 animate-pulse delay-150">arrow_forward</span>
+</div>
+</div>
+<div class="font-handwritten text-center text-xl text-text-main dark:text-[#E8DCC4] opacity-90 rotate-[-1deg]">
+                Swipe!
+            </div>
+</div>
+<div class="absolute w-60 h-80 bg-paper dark:bg-[#3E3429] shadow-polaroid transform -rotate-3 -z-10 top-2 opacity-60 rounded-sm"></div>
+</div>
+<div class="mt-8 mb-6 text-center space-y-4 px-4">
+<h1 class="text-3xl font-bold font-display text-text-main dark:text-[#E8DCC4]">
+            极简手势
+        </h1>
+<p class="text-text-muted dark:text-[#A69B8B] text-base leading-relaxed max-w-xs mx-auto">
+            左滑是勇敢告别<span class="text-stamp-red font-medium">废片</span><br/>
+            右滑是悉数珍藏<span class="text-stamp-green font-medium">美好</span>
+</p>
+</div>
+<div class="pb-6 pt-2 flex justify-center w-full">
+<button class="w-full max-w-xs bg-primary text-[#FDFBF7] py-4 rounded-xl shadow-lg shadow-primary/30 text-lg font-bold tracking-wide active:scale-95 transition-transform flex items-center justify-center gap-2 group">
+<span class="font-display">下一步</span>
+<span class="material-symbols-outlined group-hover:translate-x-1 transition-transform text-xl">arrow_forward</span>
+</button>
+</div>
+</main>
+
+</body></html>

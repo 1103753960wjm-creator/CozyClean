@@ -20,7 +20,7 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart';
 import 'package:cozy_clean/data/local/app_database.dart';
-import 'package:cozy_clean/presentation/controllers/blitz_controller.dart';
+import 'package:cozy_clean/features/blitz/data/providers/blitz_data_providers.dart';
 
 /// 默认用户 ID（单设备单用户场景）
 /// TODO: 接入登录系统后改为真实 UID

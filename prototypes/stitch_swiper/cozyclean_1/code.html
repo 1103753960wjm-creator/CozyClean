@@ -1,0 +1,146 @@
+<!DOCTYPE html><html lang="zh-CN"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>CozyClean Onboarding Step 5</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=Noto+Sans+SC:wght@400;500;700&amp;family=Ma+Shan+Zheng&amp;display=swap" rel="stylesheet">
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#8B5E3C",
+                        "primary-dark": "#6D4C3D",
+                        "secondary": "#A67B5B",
+                        "accent": "#D2B48C",
+                        "background-light": "#F5F5DC",
+                        "background-dark": "#2C241B",
+                        "paper": "#FDFBF7",
+                        "text-main": "#4A3B32",
+                        "text-muted": "#8C7A6B",
+                        "badge-gold": "#E6C200",
+                        "badge-silver": "#C0C0C0",
+                        "badge-bronze": "#CD7F32",
+                    },
+                    fontFamily: {
+                        "display": ["Plus Jakarta Sans", "Noto Sans SC", "sans-serif"],
+                        "body": ["Noto Sans SC", "sans-serif"],
+                        "handwritten": ["Ma Shan Zheng", "cursive"],
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.75rem", 
+                        "lg": "1.5rem", 
+                        "xl": "2rem", 
+                        "full": "9999px"
+                    },
+                    boxShadow: {
+                        "paper": "0 4px 6px -1px rgba(139, 94, 60, 0.1), 0 2px 4px -1px rgba(139, 94, 60, 0.06)",
+                        "polaroid": "0 4px 12px -2px rgba(139, 94, 60, 0.15), 0 2px 6px -1px rgba(139, 94, 60, 0.1)",
+                        "button": "0 4px 0 0 #5D4037, 0 8px 16px rgba(0,0,0,0.2)",
+                        "button-active": "0 0 0 0 #5D4037, inset 0 2px 4px rgba(0,0,0,0.2)",
+                        "inner-glow": "inset 0 0 20px rgba(255,255,255,0.5)",
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .bg-texture {
+            background-image: radial-gradient(#D2B48C 1px, transparent 1px);
+            background-size: 20px 20px;
+            opacity: 0.3;
+        }
+        .tape-effect {
+            background-color: rgba(255, 255, 255, 0.4);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            backdrop-filter: blur(2px);
+            transform: rotate(-2deg);
+        }
+        body {
+          min-height: max(667px, 100dvh);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-body text-text-main dark:text-[#E8DCC4] min-h-screen flex flex-col overflow-hidden transition-colors duration-300">
+<div class="fixed inset-0 bg-texture pointer-events-none z-0"></div>
+<header class="relative z-10 flex justify-between items-center px-6 pt-12 pb-2">
+<div class="w-12"></div> 
+<div class="flex space-x-2">
+<div class="w-2 h-2 rounded-full bg-primary/20"></div>
+<div class="w-2 h-2 rounded-full bg-primary/20"></div>
+<div class="w-2 h-2 rounded-full bg-primary/20"></div>
+<div class="w-2 h-2 rounded-full bg-primary/20"></div>
+<div class="w-6 h-2 rounded-full bg-primary"></div>
+</div>
+<button class="w-12 text-sm font-medium text-text-muted" style="">跳过</button>
+</header>
+<main class="relative z-10 flex-1 flex flex-col items-center justify-center px-6 w-full max-w-md mx-auto">
+<div class="relative w-full aspect-square max-h-[400px] mb-8 flex items-center justify-center">
+<div class="absolute inset-0 flex items-center justify-center opacity-20">
+<div class="w-64 h-64 border-4 border-dashed border-primary rounded-full animate-[spin_20s_linear_infinite]"></div>
+<div class="absolute w-72 h-72 border border-primary/30 rounded-full"></div>
+</div>
+<div class="relative w-64 h-64">
+<div class="absolute inset-0 rounded-full bg-gradient-to-tr from-accent/20 to-primary/10 blur-xl"></div>
+<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-paper dark:bg-[#3E3429] rounded-full shadow-polaroid flex items-center justify-center border-4 border-[#FFF8E7] z-10">
+<div class="relative w-full h-full p-4">
+<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+<span class="material-symbols-outlined text-6xl text-primary drop-shadow-sm" style="">verified_user</span>
+</div>
+<div class="absolute top-4 left-1/2 transform -translate-x-1/2">
+<div class="w-10 h-10 bg-[#FFECD1] rounded-full flex items-center justify-center shadow-sm border border-white">
+<span class="material-symbols-outlined text-lg text-[#E6C200]" style="">local_florist</span> 
+</div>
+</div>
+<div class="absolute right-4 top-1/2 transform -translate-y-1/2">
+<div class="w-10 h-10 bg-[#FFECD1] rounded-full flex items-center justify-center shadow-sm border border-white">
+<span class="material-symbols-outlined text-lg text-[#CD7F32]" style="">cleaning_services</span> 
+</div>
+</div>
+<div class="absolute left-4 top-1/2 transform -translate-y-1/2">
+<div class="w-10 h-10 bg-[#FFECD1] rounded-full flex items-center justify-center shadow-sm border border-white">
+<span class="material-symbols-outlined text-lg text-[#C0C0C0]" style="">photo_library</span> 
+</div>
+</div>
+<div class="absolute bottom-4 left-1/2 transform -translate-x-1/2">
+<div class="w-10 h-10 bg-[#FFECD1] rounded-full flex items-center justify-center shadow-sm border border-white">
+<span class="material-symbols-outlined text-lg text-primary" style="">energy_savings_leaf</span> 
+</div>
+</div>
+</div>
+</div>
+<span class="material-symbols-outlined absolute top-0 right-0 text-accent animate-pulse" style="font-size: 24px;">spark</span>
+<span class="material-symbols-outlined absolute bottom-10 left-0 text-accent animate-pulse delay-75" style="font-size: 20px;">star</span>
+<div class="absolute -top-4 left-1/2 transform -translate-x-1/2 w-24 h-8 tape-effect z-20"></div>
+</div>
+</div>
+<div class="text-center space-y-4 mb-10 relative z-10 bg-paper/60 backdrop-blur-sm p-6 rounded-2xl shadow-sm border border-white/40">
+<h1 class="text-2xl font-bold font-display text-primary dark:text-[#E8DCC4]" style="">
+                治愈与成就</h1>
+<p class="text-text-main dark:text-[#D6C6B0] leading-relaxed" style="">
+                每天 <span class="font-bold text-primary font-display text-lg" style="">5</span> 分钟，解锁成就勋章，<br>治愈相册空间和你的内心。
+            </p>
+</div>
+<div class="w-full px-4 mb-8">
+<button class="w-full group relative h-16 bg-primary hover:bg-primary-dark text-[#FFF8E7] rounded-xl shadow-button active:shadow-button-active active:translate-y-1 transition-all duration-150 flex items-center justify-center overflow-hidden" style="">
+<div class="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent"></div>
+<div class="absolute inset-0 shadow-inner-glow rounded-xl pointer-events-none"></div>
+<span class="relative text-lg font-bold tracking-wide flex items-center gap-2" style="">
+                    进入 CozyClean
+                    <span class="material-symbols-outlined group-hover:translate-x-1 transition-transform" style="">arrow_forward</span>
+</span>
+</button>
+</div>
+</main>
+<div class="fixed bottom-0 left-0 w-32 h-32 bg-[url('https://images.unsplash.com/photo-1586075010923-2dd4570fb338?q=80&amp;w=300&amp;auto=format&amp;fit=crop')] bg-cover opacity-10 rounded-tr-full pointer-events-none z-0 mix-blend-multiply"></div>
+
+</body></html>

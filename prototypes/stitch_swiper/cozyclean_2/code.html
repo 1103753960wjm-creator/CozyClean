@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CozyClean Onboarding - Step 3</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=Noto+Sans+SC:wght@400;500;700&amp;family=Ma+Shan+Zheng&amp;display=swap" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#8B5E3C",
+                        "secondary": "#A67B5B",
+                        "accent": "#D2B48C",
+                        "background-light": "#F5F5DC",
+                        "background-dark": "#2C241B",
+                        "paper": "#FDFBF7",
+                        "text-main": "#4A3B32",
+                        "text-muted": "#8C7A6B",
+                    },
+                    fontFamily: {
+                        "display": ["Plus Jakarta Sans", "Noto Sans SC", "sans-serif"],
+                        "body": ["Noto Sans SC", "sans-serif"],
+                        "handwritten": ["Ma Shan Zheng", "cursive"],
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.75rem", 
+                        "lg": "1.5rem", 
+                        "xl": "2rem", 
+                        "full": "9999px"
+                    },
+                    boxShadow: {
+                        "paper": "0 4px 6px -1px rgba(139, 94, 60, 0.1), 0 2px 4px -1px rgba(139, 94, 60, 0.06)",
+                        "polaroid": "0 8px 16px -2px rgba(139, 94, 60, 0.2), 0 4px 6px -1px rgba(139, 94, 60, 0.1)",
+                        "glow": "0 0 15px rgba(210, 180, 140, 0.5)",
+                    },
+                    animation: {
+                        'float-up': 'floatUp 6s ease-in-out infinite',
+                        'float-down': 'floatDown 6s ease-in-out infinite',
+                        'twinkle': 'twinkle 3s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        floatUp: {
+                            '0%, 100%': { transform: 'translateY(0) rotate(-3deg)' },
+                            '50%': { transform: 'translateY(-15px) rotate(2deg)' },
+                        },
+                        floatDown: {
+                            '0%, 100%': { transform: 'translateY(0) rotate(2deg)' },
+                            '50%': { transform: 'translateY(10px) rotate(-1deg)' },
+                        },
+                        twinkle: {
+                            '0%, 100%': { opacity: 0.6, transform: 'scale(1)' },
+                            '50%': { opacity: 1, transform: 'scale(1.2)' },
+                        }
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .bg-texture {
+            background-image: radial-gradient(#D2B48C 1px, transparent 1px);
+            background-size: 20px 20px;
+            opacity: 0.3;
+        }
+        .wood-texture {
+            background-image: linear-gradient(90deg, rgba(139,94,60,0.05) 50%, transparent 50%),
+                              linear-gradient(rgba(139,94,60,0.1) 0%, transparent 100%);
+            background-size: 20px 100%, 100% 100%;
+        }
+    </style>
+<style>
+        body {
+          min-height: max(667px, 100dvh);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-body text-text-main dark:text-[#E8DCC4] min-h-screen flex flex-col overflow-hidden transition-colors duration-300">
+<div class="fixed inset-0 bg-texture pointer-events-none z-0"></div>
+<div class="absolute top-10 left-10 text-accent animate-twinkle" style="animation-delay: 0.2s">
+<span class="material-symbols-outlined text-2xl">star</span>
+</div>
+<div class="absolute top-20 right-16 text-primary/40 animate-twinkle" style="animation-delay: 1.5s">
+<span class="material-symbols-outlined text-sm">star</span>
+</div>
+<div class="absolute top-32 left-1/4 text-accent/60 animate-twinkle" style="animation-delay: 0.8s">
+<span class="material-symbols-outlined text-lg">spark</span>
+</div>
+<main class="relative z-10 flex-1 flex flex-col h-full px-6 pt-6 pb-8">
+<div class="flex justify-between items-center mb-8">
+<div class="flex gap-2">
+<div class="w-8 h-1.5 rounded-full bg-primary/20"></div>
+<div class="w-8 h-1.5 rounded-full bg-primary/20"></div>
+<div class="w-8 h-1.5 rounded-full bg-primary"></div>
+<div class="w-8 h-1.5 rounded-full bg-primary/20"></div>
+<div class="w-8 h-1.5 rounded-full bg-primary/20"></div>
+</div>
+<button class="text-sm font-medium text-text-muted hover:text-primary transition-colors">跳过</button>
+</div>
+<div class="flex-1 relative flex flex-col items-center justify-center mb-8">
+<div class="absolute top-10 z-20 animate-float-up">
+<div class="relative w-48 h-60 bg-paper dark:bg-[#3E3429] p-3 shadow-polaroid rounded transform -rotate-3 transition-all duration-500 group cursor-pointer hover:-translate-y-4">
+<div class="absolute -top-6 -right-6 text-yellow-400 animate-pulse">
+<span class="material-symbols-outlined text-3xl drop-shadow-glow">auto_awesome</span>
+</div>
+<div class="w-full h-44 bg-gray-200 dark:bg-[#2C241B] overflow-hidden rounded-sm relative">
+<img alt="Special moment" class="w-full h-full object-cover grayscale-[20%] sepia-[10%] opacity-90" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDExDV_gLgiFGtiLXDxKPd-YC9OcX0TCMgY17ZMEGTAV8O1YCxFeQ-w9LjN-yr03ei1P0XfBrccDqXqt7idCvc3mbDvn-qO53JfR1gekVI8_EMbyaOs11gga9SuSH5NoPIZPAv71-weqFBqfAxkOqEODij3CQ4MEomLWjhhaqo-fOAZMj2Q8F6qJ43NCtolGT_Vj52L-MLRQXMol97Cb_NmzGnvVdxWJRff0W-0vwKz6tyMg4GLq2pgFCTeA1s5kfjtif3DWMPFI2_G"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+</div>
+<div class="mt-3 text-center">
+<span class="font-handwritten text-xl text-primary dark:text-[#D2B48C]">Best Day!</span>
+</div>
+<div class="absolute -right-8 top-1/2 flex flex-col items-center animate-bounce opacity-70">
+<span class="material-symbols-outlined text-3xl text-primary">swipe_up</span>
+</div>
+</div>
+</div>
+<div class="absolute bottom-10 z-10 animate-float-down" style="animation-delay: -3s;">
+<div class="relative w-44 h-56 bg-paper dark:bg-[#3E3429] p-3 shadow-sm border border-black/5 rounded transform rotate-2 opacity-60 scale-95 blur-[0.5px]">
+<div class="w-full h-40 bg-gray-200 dark:bg-[#2C241B] overflow-hidden rounded-sm">
+<img alt="Blurry photo" class="w-full h-full object-cover opacity-50" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAbcM3L888Mpq3Y5gF-tybw76o6cH6ehowcxrwWSFHFGcBwnnhhB_ZQEocoPdcjAdd3q61qUxqWO8M7ZtUWlrl_BJMNfqXnmly65WAAhlcfhk3I6E0Th5Y3Umpm5mXnGoiqVTN0GvX3ch5G-GqSGJ7S67l9DCMkdJRk5940Sst7yDssVe56me3j_2laNFbDQPwbPw6wB0_axvxXimOKoYoAj-O6ZIa1qPNQ_O-DqGceA_HyzU3koc5AS7MH4vR5-m3Hsw7woaN1Zyg0"/>
+</div>
+<div class="mt-3 text-center opacity-40">
+<div class="h-2 w-16 bg-gray-300 rounded-full mx-auto"></div>
+</div>
+<div class="absolute -left-8 top-1/2 flex flex-col items-center opacity-70">
+<span class="material-symbols-outlined text-3xl text-text-muted">swipe_down</span>
+</div>
+</div>
+<div class="absolute -bottom-12 left-1/2 -translate-x-1/2 w-64 h-24 bg-[#D2B48C] rounded-t-xl shadow-inner border-t-4 border-[#A67B5B] wood-texture flex justify-center pt-2">
+<div class="w-16 h-2 bg-[#8B5E3C]/30 rounded-full"></div>
+</div>
+</div>
+</div>
+<div class="relative z-20 mt-auto bg-white/40 dark:bg-black/20 backdrop-blur-sm rounded-2xl p-6 border border-white/40 dark:border-white/5 shadow-lg">
+<h1 class="text-2xl font-bold text-text-main dark:text-[#E8DCC4] mb-3 font-display">
+                高阶交互
+            </h1>
+<p class="text-text-main/80 dark:text-[#C5BCAE] leading-relaxed mb-6">
+                上滑定格<span class="text-primary font-bold dark:text-[#D2B48C]">最高光瞬间</span>，<br/>
+                下滑让犹豫<span class="text-text-muted dark:text-[#8C7A6B]">稍后再说</span>。
+            </p>
+<button class="w-full bg-primary hover:bg-secondary text-[#FDFBF7] font-medium py-4 rounded-xl shadow-lg shadow-primary/30 transition-all transform active:scale-[0.98] flex items-center justify-center gap-2">
+<span>下一步</span>
+<span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+</main>
+
+</body></html>

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../controllers/user_stats_controller.dart';
+import 'package:cozy_clean/features/profile/application/controllers/user_stats_controller.dart';
 import 'package:cozy_clean/features/journal/presentation/widgets/poster_components.dart';
+import 'package:cozy_clean/features/blitz/application/controllers/blitz_controller.dart';
+import 'package:cozy_clean/features/onboarding/presentation/pages/intro_swiper_page.dart';
 
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
@@ -9,31 +11,33 @@ class ProfilePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Scaffold 已经提供背景，这里只需使用 CustomScrollView
-    return CustomScrollView(
-      physics: const BouncingScrollPhysics(),
-      slivers: [
-        _buildAppBar(),
-        SliverToBoxAdapter(
-          child: Column(
-            children: [
-              _buildAvatarSection(ref),
-              _buildHonorsSection(),
-              _buildStatsSection(ref),
-              _buildSettingsList(),
-              const SizedBox(height: 32),
-              const Text(
-                'CozyClean v2.0.4',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: Colors.black26,
-                  letterSpacing: 2,
+    return SafeArea(
+      child: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          _buildAppBar(),
+          SliverToBoxAdapter(
+            child: Column(
+              children: [
+                _buildAvatarSection(ref),
+                _buildHonorsSection(),
+                _buildStatsSection(ref),
+                _buildSettingsList(context, ref),
+                const SizedBox(height: 32),
+                const Text(
+                  'CozyClean v2.0.4',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.black26,
+                    letterSpacing: 2,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 48), // 给 BottomNav 留出空间
-            ],
+                const SizedBox(height: 48), // 给 BottomNav 留出空间
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -70,9 +74,10 @@ class ProfilePage extends ConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-      child: Column(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // 宝丽来相框
+          // 宝丽来相框 (缩小居左)
           Stack(
             clipBehavior: Clip.none,
             alignment: Alignment.center,
@@ -80,8 +85,8 @@ class ProfilePage extends ConsumerWidget {
               Transform.rotate(
                 angle: -0.05, // -3度左右
                 child: Container(
-                  width: 120,
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 32),
+                  width: 80,
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 24),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     boxShadow: [
@@ -108,9 +113,8 @@ class ProfilePage extends ConsumerWidget {
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) {
                             return const Center(
-                              child: Icon(Icons.person,
-                                  size: 48, color: Colors.white),
-                            );
+                                child: Icon(Icons.person,
+                                    size: 36, color: Colors.white));
                           },
                         ),
                       ),
@@ -120,69 +124,77 @@ class ProfilePage extends ConsumerWidget {
               ),
               // 顶部黄色胶带贴纸
               const Positioned(
-                top: -12,
+                top: -8,
                 child: WashiTape(
                   color: Color(0xCCFFF59D),
-                  width: 64,
-                  height: 24,
+                  width: 48,
+                  height: 16,
                   angle: 0.05,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          const Text(
-            '暖心妈妈',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: ScrapbookColors.inkBlack,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '用爱记录每一个瞬间',
-            style: TextStyle(
-              fontSize: 13,
-              fontStyle: FontStyle.italic,
-              color: const Color(0xFF73816A), // text-sub
-            ),
-          ),
-          const SizedBox(height: 12),
-          // 绿色的“高级会员”徽章
-          GestureDetector(
-            onTap: () =>
-                ref.read(userStatsControllerProvider).togglePro(!isPro),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.6),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                    color: ScrapbookColors.greenAccent.withOpacity(0.3)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: ScrapbookColors.greenAccent,
-                      shape: BoxShape.circle,
+          const SizedBox(width: 20),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '暖心妈妈',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: ScrapbookColors.inkBlack,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  '用爱记录每一个瞬间',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                    color: Color(0xFF73816A), // text-sub
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // 绿色的“高级会员”徽章
+                GestureDetector(
+                  onTap: () =>
+                      ref.read(userStatsControllerProvider).togglePro(!isPro),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                          color: ScrapbookColors.greenAccent.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: ScrapbookColors.greenAccent,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          isPro ? '高级会员' : '免费版用户',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: ScrapbookColors.greenAccent,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 6),
-                  Text(
-                    isPro ? '高级会员' : '免费版用户',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: ScrapbookColors.greenAccent,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],
@@ -425,7 +437,7 @@ class ProfilePage extends ConsumerWidget {
     );
   }
 
-  Widget _buildSettingsList() {
+  Widget _buildSettingsList(BuildContext context, WidgetRef ref) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Container(
@@ -466,6 +478,39 @@ class ProfilePage extends ConsumerWidget {
                 indent: 16,
                 endIndent: 16),
             _buildSettingRow(
+              icon: Icons.lightbulb_outline_rounded,
+              bgColor: const Color(0xFFFFF9C4),
+              iconColor: const Color(0xFFF57F17),
+              title: '演示操作引导',
+              onTap: () async {
+                await ref
+                    .read(blitzControllerProvider.notifier)
+                    .resetOnboarding();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('引导已重置，即将为您重新演示 🎁'),
+                      backgroundColor: Color(0xFF5A7D55),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                  Future.delayed(const Duration(milliseconds: 800), () {
+                    if (context.mounted) {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (_) => const IntroSwiperPage()),
+                      );
+                    }
+                  });
+                }
+              },
+            ),
+            Divider(
+                height: 1,
+                color: Colors.black.withOpacity(0.03),
+                indent: 16,
+                endIndent: 16),
+            _buildSettingRow(
               icon: Icons.cloud_sync_rounded,
               bgColor: const Color(0xFFE3F2FD),
               iconColor: Colors.blue,
@@ -495,11 +540,12 @@ class ProfilePage extends ConsumerWidget {
     required Color iconColor,
     required String title,
     String? trailingText,
+    VoidCallback? onTap,
   }) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {},
+        onTap: onTap ?? () {},
         borderRadius: BorderRadius.circular(24),
         child: Padding(
           padding: const EdgeInsets.all(16),
