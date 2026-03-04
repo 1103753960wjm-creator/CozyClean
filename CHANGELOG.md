@@ -4,6 +4,28 @@
 
 ---
 
+## v0.6.0 — 2026-03-05
+
+### 🏗️ 架构深度演进 (Feature-First Migration Complete)
+- **完成 Feature-First 架构迁移**：彻底删除旧有的按层划分目录（`lib/presentation`, `lib/data`, `lib/domain`），项目现已完全切换为按业务领域划分的架构。
+- **全量代码清理**：移除冗余的旧版控制器与页面文件，显著提升项目的可维护性与模块隔离度。
+
+### ✨ 新增模块与功能
+- **引导页模块 (Onboarding)**：新增 `features/onboarding`，包含 `IntroSwiperPage` 沉浸式滑动引导页，配套专属插画与环境音效。
+- **首页模块 (Dashboard)**：新增 `features/dashboard` 及 `DashboardPage`，作为应用全局导航中心。
+- **闪电战优化**：升级 `BlitzController` 与 `BlitzPage` 以适配新架构，并增强了部分交互边界的处理逻辑。
+- **时光手账强化**：继续完善 `features/journal` 下的 `PosterPage` 与 `JournalPage` 交互及数据映射逻辑。
+
+### 🎨 UI 探索与文档
+- **原型库 (Prototypes)**：在项目根目录新增 `prototypes/`，包含 HTML 版“上滑高光数据”、“引导页新版”等 UI 动效原型，用于快速验证视觉方案。
+- **规范强化**：添加并更新了 `.antigravity/` 下多项 AI 协作与工作流规约文档，确保开发流程标准化。
+
+### 📦 资产与配置
+- **资源扩展**：新增 `assets/images/onboarding/` 高清绘本风格插图，及配套音效 `assets/audio/`。
+- **依赖同步**：更新 `pubspec.yaml` 与 `pubspec.lock` 以同步最新的包依赖状态。
+
+---
+
 ## v0.5.0 — 2026-03-03
 
 ### ✨ UI 及功能翻新与优化

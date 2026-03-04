@@ -1,0 +1,145 @@
+<!DOCTYPE html><html lang="zh-CN"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>CozyClean Onboarding Step 4</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=Noto+Sans+SC:wght@400;500;700&amp;family=Ma+Shan+Zheng&amp;display=swap" rel="stylesheet">
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#8B5E3C",
+                        "secondary": "#A67B5B",
+                        "accent": "#D2B48C",
+                        "background-light": "#F5F5DC",
+                        "background-dark": "#2C241B",
+                        "paper": "#FDFBF7",
+                        "text-main": "#4A3B32",
+                        "text-muted": "#8C7A6B",
+                    },
+                    fontFamily: {
+                        "display": ["Plus Jakarta Sans", "Noto Sans SC", "sans-serif"],
+                        "body": ["Noto Sans SC", "sans-serif"],
+                        "handwritten": ["Ma Shan Zheng", "cursive"],
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.75rem", 
+                        "lg": "1.5rem", 
+                        "xl": "2rem", 
+                        "full": "9999px"
+                    },
+                    boxShadow: {
+                        "paper": "0 4px 6px -1px rgba(139, 94, 60, 0.1), 0 2px 4px -1px rgba(139, 94, 60, 0.06)",
+                        "polaroid": "0 2px 8px -2px rgba(139, 94, 60, 0.2), 0 1px 2px -1px rgba(139, 94, 60, 0.1)",
+                        "poster": "0 10px 30px -5px rgba(139, 94, 60, 0.2), 0 5px 15px -3px rgba(0, 0, 0, 0.1)",
+                    },
+                    rotate: {
+                        '1': '1deg',
+                        '2': '2deg',
+                        '-1': '-1deg',
+                        '-2': '-2deg',
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .bg-texture {
+            background-image: radial-gradient(#D2B48C 1px, transparent 1px);
+            background-size: 20px 20px;
+            opacity: 0.3;
+        }
+        .tape-top {
+            background-color: rgba(255, 255, 255, 0.4);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            backdrop-filter: blur(2px);
+            transform: rotate(-2deg);
+        }
+        .tape-corner {
+            background-color: rgba(220, 200, 180, 0.5);
+            transform: rotate(45deg);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(667px, 100dvh);
+    }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-body text-text-main dark:text-[#E8DCC4] min-h-screen flex flex-col overflow-hidden transition-colors duration-300">
+<div class="fixed inset-0 bg-texture pointer-events-none z-0"></div>
+<main class="relative z-10 flex-1 flex flex-col h-full px-6 pt-12 pb-8">
+<div class="flex justify-between items-center mb-6">
+<div class="flex space-x-1">
+<div class="w-2 h-2 rounded-full bg-primary/30"></div>
+<div class="w-2 h-2 rounded-full bg-primary/30"></div>
+<div class="w-2 h-2 rounded-full bg-primary/30"></div>
+<div class="w-6 h-2 rounded-full bg-primary"></div>
+<div class="w-2 h-2 rounded-full bg-primary/30"></div>
+</div>
+<button class="text-sm font-medium text-text-muted hover:text-primary transition-colors" style="">跳过</button>
+</div>
+<div class="flex-1 flex flex-col items-center justify-center relative mb-8">
+<div class="relative w-full max-w-xs aspect-[3/5] bg-paper shadow-poster transform -rotate-1 rounded-sm border border-[#E8E0D5] overflow-hidden p-4 flex flex-col items-center">
+<div class="absolute -top-3 left-1/2 -translate-x-1/2 w-32 h-8 bg-[#E6D5C3]/80 opacity-80 rotate-1 shadow-sm z-20"></div>
+<div class="w-full h-full flex flex-col gap-3 relative">
+<div class="flex justify-between items-end border-b-2 border-primary/20 pb-2 mb-1">
+<div class="font-handwritten text-xl text-primary transform -rotate-2" style="">Today's Story</div>
+<div class="text-xs font-mono text-text-muted" style="">2023.10.24</div>
+</div>
+<div class="relative bg-white p-2 pb-6 shadow-polaroid transform rotate-1 w-5/6 self-start z-10">
+<div class="aspect-[4/3] bg-gray-100 rounded-sm overflow-hidden bg-[url('https://images.unsplash.com/photo-1544654569-828e83311826?q=80&amp;w=800&amp;auto=format&amp;fit=crop')] bg-cover bg-center grayscale-[20%] sepia-[10%]">
+</div>
+<div class="absolute bottom-2 right-2 text-[10px] font-handwritten text-gray-500" style="">Sunday morning</div>
+<div class="absolute -top-2 -left-2 w-8 h-8 rounded-full bg-[#D2B48C] opacity-80 flex items-center justify-center text-white text-xs font-bold shadow-sm" style="">
+                            01
+                        </div>
+</div>
+<div class="absolute top-[35%] right-2 z-20">
+<span class="material-symbols-outlined text-4xl text-orange-400/80 transform rotate-12" style="">sunny</span>
+</div>
+<div class="bg-[#FDF6E3] p-3 shadow-sm transform -rotate-2 w-3/4 self-end text-xs leading-relaxed text-text-main/80 font-handwritten border-l-2 border-red-300/50 my-2" style="">
+                        阳光正好，微风不燥。清理完照片，心情也变得清爽起来...
+                    </div>
+<div class="relative bg-white p-2 pb-5 shadow-polaroid transform -rotate-1 w-4/5 self-center mt-auto">
+<div class="absolute -top-3 left-1/2 -translate-x-1/2 w-16 h-4 bg-primary/20 -rotate-3 z-10"></div>
+<div class="aspect-square bg-gray-100 rounded-sm overflow-hidden bg-[url('https://images.unsplash.com/photo-1517487881594-2787fef5ebf7?q=80&amp;w=800&amp;auto=format&amp;fit=crop')] bg-cover bg-center grayscale-[10%]">
+</div>
+</div>
+<div class="absolute bottom-2 left-2">
+<span class="material-symbols-outlined text-3xl text-primary/40" style="">local_florist</span>
+</div>
+<div class="absolute bottom-4 right-4 text-[10px] text-text-muted tracking-widest font-mono uppercase" style="">
+                        Cozy Clean
+                    </div>
+</div>
+<div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] opacity-40 pointer-events-none mix-blend-multiply"></div>
+</div>
+<div class="absolute top-10 -right-4 w-20 h-20 bg-[#E6D5C3] rounded-full blur-xl opacity-40 -z-10"></div>
+<div class="absolute bottom-20 -left-6 w-32 h-32 bg-[#D2B48C] rounded-full blur-2xl opacity-30 -z-10"></div>
+</div>
+<div class="w-full space-y-8 mt-auto">
+<div class="text-center space-y-3">
+<h1 class="text-2xl font-bold text-text-main dark:text-[#E8DCC4] font-display" style="">
+                    记录高光</h1>
+<p class="text-text-muted dark:text-[#A69B8B] leading-relaxed px-4" style="">
+                    每一轮清理结束，你收藏过的高光都会整合自动生成长图供你分享</p>
+</div>
+<button class="w-full bg-primary hover:bg-[#7A5235] text-white font-medium py-4 rounded-xl shadow-lg shadow-primary/20 active:scale-[0.98] transition-all duration-200 flex items-center justify-center group" style="">
+<span class="mr-2" style="">下一步</span>
+<span class="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform" style="">arrow_forward</span>
+</button>
+</div>
+</main>
+
+</body></html>

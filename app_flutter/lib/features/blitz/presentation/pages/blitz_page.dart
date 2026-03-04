@@ -18,6 +18,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:ui' as ui;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:appinio_swiper/appinio_swiper.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -26,8 +27,8 @@ import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 import 'package:cozy_clean/features/blitz/application/controllers/blitz_controller.dart';
 import 'package:cozy_clean/features/blitz/application/state/blitz_state.dart';
 import 'package:cozy_clean/features/blitz/domain/models/photo_group.dart';
-import 'package:cozy_clean/presentation/controllers/user_stats_controller.dart';
-import 'package:cozy_clean/presentation/pages/summary_page.dart';
+import 'package:cozy_clean/features/profile/application/controllers/user_stats_controller.dart';
+import 'package:cozy_clean/features/blitz/presentation/pages/summary_page.dart';
 
 /// 闪电战核心展示主页 — 四方向滑动整理照片
 class BlitzPage extends ConsumerStatefulWidget {
@@ -75,6 +76,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
   // ============================================================
 
   void _requestUndo() {
+    final blitzState = ref.read(blitzControllerProvider);
     final success = ref.read(blitzControllerProvider.notifier).undoLastSwipe();
     if (!success) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -89,7 +91,12 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
       );
       return;
     }
-    _swiperController.unswipe();
+
+    if (blitzState.isReviewingPending) {
+      _pendingSwiperController.unswipe();
+    } else {
+      _swiperController.unswipe();
+    }
     HapticFeedback.mediumImpact();
   }
 
@@ -286,90 +293,213 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
   // UI 组件构建
   // ============================================================
 
-  /// 引导蒙版页
   Widget _buildOnboardingOverlay(BuildContext context) {
     return Positioned.fill(
       child: GestureDetector(
         onTap: () {
           ref.read(blitzControllerProvider.notifier).dismissOnboarding();
         },
-        child: Container(
-          color: Colors.black.withValues(alpha: 0.65), // 半透明遮罩
-          child: SafeArea(
-            child: Stack(
-              children: [
-                // 上方指示
-                const Align(
-                  alignment: Alignment.topCenter,
-                  child: Padding(
-                    padding: EdgeInsets.only(top: 140),
-                    child: Text(
-                      '↑ 上滑高光',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: Container(
+            color: Colors.black.withOpacity(0.5), // Semi-transparent overlay
+            child: SafeArea(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Top Intructions
+                  Padding(
+                    padding: const EdgeInsets.only(top: 32),
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF5A7D55)
+                                .withOpacity(0.2), // primary/20
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                                color: Colors.white.withOpacity(0.2)),
+                          ),
+                          child: const Text('手势操作指南',
+                              style:
+                                  TextStyle(color: Colors.white, fontSize: 14)),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          '轻松整理您的回忆',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-                // 下方指示
-                const Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Padding(
-                    padding: EdgeInsets.only(bottom: 240),
-                    child: Text(
-                      '↓ 下滑待定',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-                // 左侧指示
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Padding(
-                    padding: EdgeInsets.only(left: 24, bottom: 40),
-                    child: Text(
-                      '← 左滑删除',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-                // 右侧指示
-                const Align(
-                  alignment: Alignment.centerRight,
-                  child: Padding(
-                    padding: EdgeInsets.only(right: 24, bottom: 40),
-                    child: Text(
-                      '右滑珍藏 →',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-                // 底部边界提示：轻触任意位置继续
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 120),
-                    child: Text(
-                      '— 轻触任意位置继续 —',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.7),
-                        fontSize: 14,
-                        letterSpacing: 1.5,
+
+                  // Central Interaction Guide
+                  Center(
+                    child: SizedBox(
+                      width: 280,
+                      height: 340,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        alignment: Alignment.center,
+                        children: [
+                          // Central Box
+                          Container(
+                            width: 180,
+                            height: 240,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.1),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.4),
+                                width: 2,
+                                style: BorderStyle.solid,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const Center(
+                              child: Icon(Icons.photo_library_outlined,
+                                  size: 48, color: Colors.white54),
+                            ),
+                          ),
+                          // Top Arrow (Highlight)
+                          const Positioned(
+                            top: -40,
+                            child: Column(
+                              children: [
+                                Text('↑ 上滑高光',
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                          // Bottom Arrow (Skip)
+                          const Positioned(
+                            bottom: -40,
+                            child: Column(
+                              children: [
+                                Text('↓ 下滑待定',
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                          // Left Arrow (Delete)
+                          const Positioned(
+                            left: -60,
+                            child: Row(
+                              children: [
+                                Text('← 左滑删除',
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                          // Right Arrow (Keep)
+                          const Positioned(
+                            right: -60,
+                            child: Row(
+                              children: [
+                                Text('右滑珍藏 →',
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                          // Mascot Icon
+                          Positioned(
+                            bottom: -20,
+                            right: 0,
+                            child: Transform.rotate(
+                              angle: 0.2,
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFDFBF7),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                      color: const Color(0xFF5A7D55)
+                                          .withOpacity(0.3),
+                                      width: 2),
+                                  boxShadow: [
+                                    BoxShadow(
+                                        color: Colors.black.withOpacity(0.2),
+                                        blurRadius: 8)
+                                  ],
+                                ),
+                                child: const Icon(Icons.face_6_rounded,
+                                    color: Color(0xFF5A7D55), size: 32),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                ),
-              ],
+
+                  // Bottom Action
+                  Padding(
+                    padding:
+                        const EdgeInsets.only(bottom: 40, left: 40, right: 40),
+                    child: Column(
+                      children: [
+                        const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.draw_rounded,
+                                color: Colors.white70, size: 16),
+                            SizedBox(width: 4),
+                            Text('随心滑动，让相册保持整洁',
+                                style: TextStyle(
+                                    color: Colors.white70, fontSize: 14)),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFDFBF7),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: const [
+                              BoxShadow(
+                                  color: Color(0xFFD1D5DB),
+                                  offset: Offset(0, 4))
+                            ],
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text('开始体验',
+                                  style: TextStyle(
+                                      color: Color(0xFF1F2937),
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 4)),
+                              SizedBox(width: 12),
+                              Icon(Icons.touch_app_rounded,
+                                  color: Color(0xFF5A7D55)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -543,53 +673,46 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              RichText(
-                text: TextSpan(
+              Transform.rotate(
+                angle: -0.017, // ~ -1 deg (rotate-slight-left)
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
                   children: [
-                    TextSpan(
-                      text: '$currentIndex',
+                    Text(
+                      '$currentIndex',
                       style: const TextStyle(
                         color: Color(0xFF4A4238),
-                        fontSize: 26,
-                        fontFamily: 'Georgia', // 衬线体
-                        fontStyle: FontStyle.italic,
+                        fontSize: 32,
+                        fontFamily: 'Georgia',
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    TextSpan(
-                      text: ' / $total',
-                      style: const TextStyle(
-                        color: Color(0xFF8C867E),
-                        fontSize: 16,
-                        fontFamily: 'Georgia',
-                        fontStyle: FontStyle.italic,
-                        fontWeight: FontWeight.w600,
+                    const SizedBox(width: 4),
+                    const Text(
+                      '/',
+                      style: TextStyle(
+                        color: Color(0xFF8C7A6B),
+                        fontSize: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '$total',
+                      style: TextStyle(
+                        color: const Color(0xFF8C7A6B).withValues(alpha: 0.6),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 2),
-              RichText(
-                text: TextSpan(
-                  children: [
-                    const WidgetSpan(
-                      alignment: PlaceholderAlignment.middle,
-                      child: Icon(Icons.star_rounded,
-                          color: Color(0xFFF7D154), size: 14),
-                    ),
-                    TextSpan(
-                      text:
-                          ' ${favoritesCount == 0 ? "0" : favoritesCount}/${BlitzState.maxFavorites}',
-                      style: const TextStyle(
-                        color: Color(0xFFF7D154),
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              const SizedBox(height: 4),
+              // 右侧：高光进度特效组件
+              _HighlightCounter(
+                  count: favoritesCount, maxCount: BlitzState.maxFavorites),
             ],
           ),
         ],
@@ -774,27 +897,32 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                 progress: deleteProgress,
                 onTap: () {
                   if (blitzState.isReviewingPending) {
-                    ref
-                        .read(blitzControllerProvider.notifier)
-                        .reviewPendingLeft();
+                    _pendingSwiperController.swipeLeft();
                   } else {
                     _swiperController.swipeLeft();
                   }
                 },
               ),
               // 3. 稍后/待定 (粉边圈转蓝)
-              _buildDynamicActionButton(
-                outlineIcon: Icons.arrow_downward_rounded,
-                solidIcon: Icons.arrow_downward_rounded,
-                label: '稍后',
-                baseSize: 70,
-                baseBorderColor: const Color(0xFFC79E9A).withValues(alpha: 0.5),
-                activeColor: const Color(0xFF64B5F6),
-                activeBorderColor: const Color(0xFFBBDEFB),
-                progress: pendingProgress,
-                onTap: blitzState.isReviewingPending
-                    ? null
-                    : () => _swiperController.swipeDown(),
+              Visibility(
+                visible: !blitzState.isReviewingPending,
+                maintainSize: true,
+                maintainAnimation: true,
+                maintainState: true,
+                child: _buildDynamicActionButton(
+                  outlineIcon: Icons.arrow_downward_rounded,
+                  solidIcon: Icons.arrow_downward_rounded,
+                  label: '稍后',
+                  baseSize: 70,
+                  baseBorderColor:
+                      const Color(0xFFC79E9A).withValues(alpha: 0.5),
+                  activeColor: const Color(0xFF64B5F6),
+                  activeBorderColor: const Color(0xFFBBDEFB),
+                  progress: pendingProgress,
+                  onTap: blitzState.isReviewingPending
+                      ? null
+                      : () => _swiperController.swipeDown(),
+                ),
               ),
               // 4. 高光 (金)
               _buildDynamicActionButton(
@@ -807,10 +935,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                 progress: highlightProgress,
                 onTap: () {
                   if (blitzState.isReviewingPending) {
-                    final success = ref
-                        .read(blitzControllerProvider.notifier)
-                        .reviewPendingUp();
-                    if (!success) _showFavoritesFullWarning();
+                    _pendingSwiperController.swipeUp();
                   } else {
                     _swiperController.swipeUp();
                   }
@@ -827,9 +952,8 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                 progress: keepProgress,
                 onTap: () {
                   if (blitzState.isReviewingPending) {
-                    ref
-                        .read(blitzControllerProvider.notifier)
-                        .reviewPendingRight();
+                    // [修复] 复审阶段按钮点击时也触发滑动动画，而非直接调用 controller
+                    _pendingSwiperController.swipeRight();
                   } else {
                     _swiperController.swipeRight();
                   }
@@ -1393,13 +1517,8 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
             backgroundCardCount: total > 2 ? 2 : 1,
             backgroundCardScale: 0.92,
             backgroundCardOffset: const Offset(0, 15),
-            // 回放阶段禁用下滑（不能再跳过了）
-            swipeOptions: const SwipeOptions.only(
-              left: true,
-              right: true,
-              up: true,
-              down: false,
-            ),
+            // [修复] 启用全方向滑动，防止因方向限制导致的手势处理卡顿
+            swipeOptions: const SwipeOptions.all(),
             onSwipeEnd:
                 (int previousIndex, int targetIndex, SwiperActivity activity) {
               _handlePendingSwipeEnd(activity);
@@ -1470,40 +1589,58 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
         HapticFeedback.lightImpact();
         final success = notifier.reviewPendingUp();
         if (!success) {
+          // [修复] 收藏满且在回放阶段时，也需要执行 unswipe 弹回卡片
+          _pendingSwiperController.unswipe();
           _showFavoritesFullWarning();
         }
         break;
 
       case AxisDirection.down:
-        // 回放阶段禁用下滑，SwipeOptions 已阻止，此处为安全兜底
+        // [修复] 回放阶段虽然启用下滑以保证手势流畅，但不执行实际逻辑，弹回卡片
+        _pendingSwiperController.unswipe();
         break;
     }
   }
 
-  /// 待定区回放阶段顶部标题
+  /// 待定区回放阶段顶栏
   Widget _buildPendingReviewHeader(BlitzState blitzState) {
     final current = blitzState.pendingReviewIndex + 1;
     final total = blitzState.sessionPending.length;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // 返回按钮
-          IconButton(
-            onPressed: _showExitConfirmationBottomSheet,
-            icon: const Icon(
-              Icons.arrow_back_ios_rounded,
-              color: Color(0xFF6B6560),
-              size: 20,
+          // 圆形返回按键 (保持与主流程一致)
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: IconButton(
+              onPressed: _showExitConfirmationBottomSheet,
+              icon: const Icon(
+                Icons.arrow_back_rounded,
+                color: Color(0xFF6B6560),
+                size: 24,
+              ),
             ),
           ),
-          // 回放标题
+
+          // 回放状态标题
           Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                '📋 待定区回放',
+                '📋 待定区复审',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -1521,8 +1658,12 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
               ),
             ],
           ),
-          // 占位保持居中
-          const SizedBox(width: 48),
+
+          // [修复] 增加高光进度组件，即使在回放阶段用户也需要看到收藏进度
+          _HighlightCounter(
+            count: blitzState.favoritesCount,
+            maxCount: BlitzState.maxFavorites,
+          ),
         ],
       ),
     );
@@ -1772,6 +1913,26 @@ class _SwipeablePendingCardState extends State<_SwipeablePendingCard>
     with SingleTickerProviderStateMixin {
   Offset _dragOffset = Offset.zero;
   bool _isDragging = false;
+  late AnimationController _snapController;
+  late Animation<Offset> _snapAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _snapController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _snapAnimation = _snapController.drive(
+      Tween<Offset>(begin: Offset.zero, end: Offset.zero),
+    );
+  }
+
+  @override
+  void dispose() {
+    _snapController.dispose();
+    super.dispose();
+  }
 
   /// 滑动阈值（超过此距离触发操作）
   static const double _threshold = 80.0;
@@ -1802,25 +1963,40 @@ class _SwipeablePendingCardState extends State<_SwipeablePendingCard>
           } else {
             widget.onSwipeRight();
           }
+          // 触发后不需回弹动画，直接重置位移以便下一张（或已移除）
+          setState(() => _dragOffset = Offset.zero);
         } else if (!isHorizontal && dy < -_threshold) {
           // 上滑超过阈值
           widget.onSwipeUp();
+          setState(() => _dragOffset = Offset.zero);
+        } else {
+          // [修复] 未触发操作时，执行平滑回弹动画
+          _snapAnimation = _snapController.drive(
+            Tween<Offset>(begin: _dragOffset, end: Offset.zero),
+          );
+          _snapController.forward(from: 0.0).then((_) {
+            if (mounted) setState(() => _dragOffset = Offset.zero);
+          });
         }
-
-        // 回弹（如果没有触发操作，回到原位）
-        setState(() => _dragOffset = Offset.zero);
       },
-      child: Transform.translate(
-        offset: _dragOffset,
-        child: Transform.rotate(
-          angle: rotation,
-          child: _buildCard(),
-        ),
+      child: AnimatedBuilder(
+        animation: _snapController,
+        builder: (context, child) {
+          final offset = _isDragging ? _dragOffset : _snapAnimation.value;
+          final double rotation = offset.dx * 0.001; // 轻微旋转
+          return Transform.translate(
+            offset: offset,
+            child: Transform.rotate(
+              angle: rotation,
+              child: _buildCard(offset),
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildCard() {
+  Widget _buildCard(Offset currentOffset) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1871,8 +2047,8 @@ class _SwipeablePendingCardState extends State<_SwipeablePendingCard>
                     ),
                   ),
                   // 方向指示印章
-                  if (_isDragging || _dragOffset != Offset.zero)
-                    _buildDragStamp(),
+                  if (_isDragging || _snapController.isAnimating)
+                    _buildDragStamp(currentOffset),
                 ],
               ),
             ),
@@ -1884,9 +2060,9 @@ class _SwipeablePendingCardState extends State<_SwipeablePendingCard>
   }
 
   /// 拖拽方向指示印章
-  Widget _buildDragStamp() {
-    final dx = _dragOffset.dx;
-    final dy = _dragOffset.dy;
+  Widget _buildDragStamp(Offset offset) {
+    final dx = offset.dx;
+    final dy = offset.dy;
     if (dx == 0 && dy == 0) return const SizedBox.shrink();
 
     final bool isHorizontal = dx.abs() >= dy.abs();
@@ -2019,5 +2195,160 @@ class _TooltipTrianglePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _TooltipTrianglePainter oldDelegate) {
     return oldDelegate.color != color;
+  }
+}
+
+// ============================================================================
+// 原型：上滑高光计件动画组件
+// ============================================================================
+
+class _HighlightCounter extends StatefulWidget {
+  final int count;
+  final int maxCount;
+
+  const _HighlightCounter({required this.count, required this.maxCount});
+
+  @override
+  State<_HighlightCounter> createState() => _HighlightCounterState();
+}
+
+class _HighlightCounterState extends State<_HighlightCounter>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _glowAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 600));
+
+    _scaleAnimation = TweenSequence([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.15), weight: 30),
+      TweenSequenceItem(tween: Tween(begin: 1.15, end: 0.95), weight: 40),
+      TweenSequenceItem(tween: Tween(begin: 0.95, end: 1.0), weight: 30),
+    ]).animate(CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeOut)); // 替换 easeOutBack，防止 t 越界引发 TweenSequence 断言错误
+
+    // 发光脉冲曲线：快速亮起，缓慢消失
+    _glowAnimation = TweenSequence([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.0), weight: 20),
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.0), weight: 80),
+    ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+  }
+
+  @override
+  void didUpdateWidget(_HighlightCounter oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.count > oldWidget.count) {
+      _controller.forward(from: 0.0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.none,
+          children: [
+            // 背景发光扩散层 (Pulse Glow) - 完全基于原型 shadow-glow 的动态增强
+            if (_glowAnimation.value > 0.01)
+              Transform.scale(
+                scale: 1.0 + 0.8 * _glowAnimation.value,
+                child: Container(
+                  width: 50,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFFD54F)
+                            .withValues(alpha: 0.3 * _glowAnimation.value),
+                        blurRadius: 15 * _glowAnimation.value,
+                        spreadRadius: 8 * _glowAnimation.value,
+                      ),
+                      BoxShadow(
+                        color: const Color(0xFFFFD54F)
+                            .withValues(alpha: 0.5 * _glowAnimation.value),
+                        blurRadius: 5 * _glowAnimation.value,
+                        spreadRadius: 2 * _glowAnimation.value,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            // 前景药丸
+            Transform.rotate(
+              angle: 0.035, // 2 deg (rotate-slight-right)
+              child: Transform.scale(
+                scale: _scaleAnimation.value,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15), // 微弱背景手感
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFFFFD54F).withValues(
+                        alpha: widget.count > 0 ? 0.3 : 0.1,
+                      ),
+                      width: 1,
+                    ),
+                    // 内部发光 (Inner Glow)
+                    boxShadow: [
+                      if (_glowAnimation.value > 0.01)
+                        BoxShadow(
+                          color: const Color(0xFFFFD54F)
+                              .withValues(alpha: 0.6 * _glowAnimation.value),
+                          blurRadius: 10 * _glowAnimation.value,
+                          spreadRadius: 1 * _glowAnimation.value,
+                        ),
+                      // 静态发光阴影
+                      BoxShadow(
+                        color: const Color(0xFFFFD54F).withValues(alpha: 0.05),
+                        blurRadius: 4,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.star_rounded,
+                        color: Color(0xFFFFD54F),
+                        size: 16,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${widget.count}/${widget.maxCount}',
+                        style: const TextStyle(
+                          color: Color(0xFFFFD54F),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          fontFamily: 'Georgia',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 }

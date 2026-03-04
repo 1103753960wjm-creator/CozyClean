@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Photo Cleaning Page - Highlight Interaction</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=Noto+Sans+SC:wght@400;500;700&amp;family=Caveat:wght@400;600;700&amp;display=swap"
+        rel="stylesheet" />
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#8B5E3C",
+                        "secondary": "#A67B5B",
+                        "accent": "#D2B48C",
+                        "background-light": "#F5F5DC",
+                        "background-dark": "#2C241B",
+                        "paper": "#FDFBF7",
+                        "text-main": "#4A3B32",
+                        "text-muted": "#8C7A6B",
+                        "action-red": "#E57373",
+                        "action-green": "#81C784",
+                        "action-yellow": "#FFD54F",
+                        "action-blue": "#64B5F6"
+                    },
+                    fontFamily: {
+                        "display": ["Plus Jakarta Sans", "Noto Sans SC", "sans-serif"],
+                        "body": ["Noto Sans SC", "sans-serif"],
+                        "hand": ["Caveat", "cursive"],
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.75rem",
+                        "lg": "1.5rem",
+                        "xl": "2rem",
+                        "full": "9999px"
+                    },
+                    boxShadow: {
+                        "polaroid": "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0,0,0,0.02)",
+                        "glow": "0 0 15px 5px rgba(255, 213, 79, 0.6)",
+                    },
+                    backgroundImage: {
+                        'dot-pattern': 'radial-gradient(#D2B48C 1.5px, transparent 1.5px)',
+                    },
+                    animation: {
+                        'float-up': 'floatUp 0.8s ease-out forwards',
+                        'sparkle': 'sparkle 1s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        floatUp: {
+                            '0%': { transform: 'translateY(0) rotate(2deg)', opacity: '1' },
+                            '100%': { transform: 'translateY(-150%) rotate(5deg)', opacity: '0.8' },
+                        },
+                        sparkle: {
+                            '0%, 100%': { opacity: '0.5', transform: 'scale(0.8)' },
+                            '50%': { opacity: '1', transform: 'scale(1.2)' },
+                        }
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        .bg-texture {
+            background-size: 24px 24px;
+            opacity: 0.4;
+        }
+
+        .rotate-slight-right {
+            transform: rotate(2deg);
+        }
+
+        .rotate-slight-left {
+            transform: rotate(-1deg);
+        }
+
+        .hand-border {
+            border-radius: 2px 255px 3px 25px / 255px 5px 225px 3px;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+
+        .filled-icon {
+            font-variation-settings: 'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .sparkle-shape {
+            position: absolute;
+            background: #FFD700;
+            clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+        }
+
+        .star-trail {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: #FFD54F;
+            border-radius: 50%;
+            box-shadow: 0 0 4px #FFD54F;
+        }
+
+        .motion-blur-up {
+            filter: blur(0px);
+        }
+    </style>
+    <style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+    <style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+    <style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+
+<body
+    class="bg-background-light dark:bg-background-dark font-body text-text-main dark:text-[#E8DCC4] min-h-screen flex flex-col overflow-hidden transition-colors duration-300">
+    <div class="fixed inset-0 bg-dot-pattern bg-texture pointer-events-none z-0"></div>
+    <main class="relative z-10 flex-1 flex flex-col h-full">
+        <header class="flex items-center justify-between px-6 pt-12 pb-2 relative z-50">
+            <button
+                class="w-10 h-10 flex items-center justify-center rounded-full bg-paper/50 hover:bg-white transition-colors text-text-muted">
+                <span class="material-symbols-outlined">arrow_back</span>
+            </button>
+            <div class="flex flex-col items-end">
+                <div class="flex items-baseline gap-1 font-hand text-2xl text-text-main rotate-slight-left">
+                    <span class="font-bold text-3xl">1</span>
+                    <span class="text-xl text-text-muted">/</span>
+                    <span class="text-xl text-text-muted">50</span>
+                </div>
+                <div class="relative">
+                    <div class="absolute inset-0 bg-action-yellow/30 blur-md rounded-full scale-150 animate-pulse">
+                    </div>
+                    <div
+                        class="relative flex items-center gap-1 text-sm font-hand text-action-yellow font-bold rotate-slight-right -mt-1 shadow-glow rounded-full px-2 py-0.5 bg-white/20 backdrop-blur-[1px]">
+                        <span class="material-symbols-outlined filled-icon text-[16px]">star</span>
+                        <span>2/4</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+        <section class="flex-1 flex flex-col items-center justify-center relative w-full max-w-md mx-auto px-6 py-4">
+            <div
+                class="absolute inset-0 pointer-events-none flex flex-col justify-between items-center py-20 px-8 z-0 opacity-20">
+                <div
+                    class="text-action-yellow font-hand text-lg font-bold flex flex-col items-center transform -translate-y-4">
+                    <span class="material-symbols-outlined text-4xl mb-1">star</span>
+                    <span>上滑高光</span>
+                </div>
+            </div>
+            <div
+                class="absolute w-[85%] aspect-[3/4] bg-white rounded-lg shadow-sm transform scale-90 translate-y-8 rotate-3 border border-stone-200 z-10">
+            </div>
+            <div
+                class="absolute w-[88%] aspect-[3/4] bg-white rounded-lg shadow-sm transform scale-95 translate-y-4 -rotate-2 border border-stone-200 z-20">
+            </div>
+            <div
+                class="relative w-full aspect-[3/4] z-30 transform -translate-y-[40%] -rotate-6 transition-all duration-700 ease-out filter blur-[1px]">
+                <div class="absolute -inset-10 pointer-events-none z-50">
+                    <div class="sparkle-shape w-3 h-3 left-0 bottom-10 animate-sparkle" style="animation-delay: 0.1s;">
+                    </div>
+                    <div class="sparkle-shape w-2 h-2 left-4 bottom-20 animate-sparkle" style="animation-delay: 0.3s;">
+                    </div>
+                    <div class="sparkle-shape w-4 h-4 -left-4 bottom-4 animate-sparkle" style="animation-delay: 0s;">
+                    </div>
+                    <div class="sparkle-shape w-3 h-3 right-0 bottom-12 animate-sparkle" style="animation-delay: 0.2s;">
+                    </div>
+                    <div class="sparkle-shape w-2 h-2 -right-2 bottom-24 animate-sparkle"
+                        style="animation-delay: 0.4s;"></div>
+                    <div class="sparkle-shape w-5 h-5 top-0 left-1/2 animate-sparkle"
+                        style="animation-delay: 0.1s; background: #FFFACD;"></div>
+                </div>
+                <div class="absolute -top-20 -right-10 w-40 h-60 pointer-events-none z-40 overflow-hidden"
+                    style="transform: rotate(30deg);">
+                    <div class="star-trail top-[80%] left-[20%] opacity-80"></div>
+                    <div class="star-trail top-[60%] left-[30%] w-2 h-2 opacity-60"></div>
+                    <div class="star-trail top-[40%] left-[45%] w-1 h-1 opacity-40"></div>
+                    <div class="star-trail top-[20%] left-[60%] opacity-20"></div>
+                </div>
+                <div class="w-full h-full bg-white p-4 pb-12 shadow-polaroid hand-border">
+                    <div class="w-full h-full bg-stone-100 overflow-hidden relative hand-border">
+                        <img alt="Memory Photo" class="w-full h-full object-cover sepia-[.15]"
+                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuBvvyeTzA0pthiGxJ-zeNjWLfpa3kxcnC4gkLu6zfBKgCslGHXqfpmwm4RqIFoW6sNzG3woQ2JxvYcsYCrHrSxGQIJI_lpIyrv8bp1BCtmRZfL9wY8FzXPzdL4l5cpOjFn3hKwdiOIi2qaq-cJiL512ESd_WN1JuPqzZq64BE8EoH_cSvP6zW3f6qBmNOlLF6fHvAQmkxpQZP0HdVAOHZFq6LBAtEZHYI-f2EOR1UBPdyD2PJwY5YOf7fWkqtgEPMWD_gPz3p6OYJAb" />
+                        <div
+                            class="absolute bottom-3 right-3 bg-black/50 text-white/90 text-xs px-2 py-1 rounded font-mono backdrop-blur-sm">
+                            2023.05.20
+                        </div>
+                        <div class="absolute inset-0 flex items-center justify-center z-50">
+                            <div
+                                class="w-40 h-40 rounded-full border-4 border-action-yellow/60 flex items-center justify-center transform -rotate-12 bg-action-yellow/10 backdrop-blur-sm shadow-lg">
+                                <span
+                                    class="material-symbols-outlined filled-icon text-action-yellow text-[100px] drop-shadow-md">star</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 w-32 h-8 bg-[#E6DCC8] opacity-90 shadow-sm rotate-1 z-40 flex items-center justify-center"
+                        style="clip-path: polygon(2% 0%, 98% 5%, 100% 100%, 0% 95%);">
+                        <div class="w-full h-full opacity-30 bg-repeat-x"
+                            style="background-image: repeating-linear-gradient(45deg, transparent, transparent 2px, #fff 2px, #fff 4px);">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div
+                class="absolute w-[88%] aspect-[3/4] bg-white rounded-lg shadow-sm transform scale-100 translate-y-0 rotate-0 border border-stone-200 z-20 transition-all duration-500">
+                <div class="w-full h-full bg-stone-50 p-4 pb-12">
+                    <div class="w-full h-full bg-stone-200/50"></div>
+                </div>
+            </div>
+        </section>
+        <section class="px-6 pb-32 pt-6 w-full max-w-md mx-auto relative z-50">
+            <div class="flex items-center justify-between gap-2">
+                <button class="flex flex-col items-center gap-2 group w-14">
+                    <div
+                        class="w-12 h-12 rounded-full bg-paper border border-[#E8DCC4] flex items-center justify-center shadow-sm group-active:scale-95 transition-transform">
+                        <span class="material-symbols-outlined text-text-muted text-[24px]">undo</span>
+                    </div>
+                    <span class="text-[10px] font-medium text-text-muted">撤销</span>
+                </button>
+                <button class="flex flex-col items-center gap-2 group w-14">
+                    <div
+                        class="w-12 h-12 rounded-full bg-paper border border-[#E8DCC4] flex items-center justify-center shadow-sm group-active:scale-95 transition-transform hover:border-action-red/30">
+                        <span class="material-symbols-outlined text-action-red text-[24px]">delete</span>
+                    </div>
+                    <span class="text-[10px] font-medium text-text-muted">删除</span>
+                </button>
+                <button class="flex flex-col items-center gap-2 group w-16 -mt-2">
+                    <div
+                        class="w-14 h-14 rounded-full bg-white border-2 border-primary/20 flex items-center justify-center shadow-paper group-active:scale-95 transition-transform">
+                        <span class="material-symbols-outlined text-primary text-[28px]">arrow_downward</span>
+                    </div>
+                    <span class="text-xs font-medium text-primary">稍后</span>
+                </button>
+                <button class="flex flex-col items-center gap-2 group w-14">
+                    <div
+                        class="w-12 h-12 rounded-full bg-paper border border-[#E8DCC4] flex items-center justify-center shadow-sm group-active:scale-95 transition-transform ring-2 ring-action-yellow/50">
+                        <span
+                            class="material-symbols-outlined text-primary text-[24px] filled-icon text-action-yellow">star</span>
+                    </div>
+                    <span class="text-[10px] font-medium text-text-muted">高光</span>
+                </button>
+                <button class="flex flex-col items-center gap-2 group w-14">
+                    <div
+                        class="w-12 h-12 rounded-full bg-paper border border-[#E8DCC4] flex items-center justify-center shadow-sm group-active:scale-95 transition-transform hover:border-action-blue/30">
+                        <span class="material-symbols-outlined text-action-blue text-[24px]">favorite</span>
+                    </div>
+                    <span class="text-[10px] font-medium text-text-muted">珍藏</span>
+                </button>
+            </div>
+        </section>
+    </main>
+    <nav class="fixed bottom-0 left-0 w-full z-50">
+        <div
+            class="absolute inset-0 bg-white/80 dark:bg-[#2C241B]/90 backdrop-blur-md border-t border-[#E8DCC4]/50 dark:border-white/5">
+        </div>
+        <div class="relative flex justify-between items-end px-6 pb-6 pt-3 max-w-md mx-auto">
+            <a class="flex flex-col items-center justify-center gap-1 w-16 group opacity-60 hover:opacity-100 transition-opacity"
+                href="#">
+                <div class="p-2">
+                    <span class="material-symbols-outlined text-text-main dark:text-[#E8DCC4] text-[28px]">home</span>
+                </div>
+                <span class="text-xs font-medium text-text-main dark:text-[#E8DCC4]">首页</span>
+            </a>
+            <a class="flex flex-col items-center justify-center gap-1 w-16 group opacity-60 hover:opacity-100 transition-opacity"
+                href="#">
+                <div class="p-2">
+                    <span
+                        class="material-symbols-outlined text-text-main dark:text-[#E8DCC4] text-[28px]">menu_book</span>
+                </div>
+                <span class="text-xs font-medium text-text-main dark:text-[#E8DCC4]">手账</span>
+            </a>
+            <a class="flex flex-col items-center justify-center gap-1 w-16 group opacity-60 hover:opacity-100 transition-opacity"
+                href="#">
+                <div class="p-2">
+                    <span class="material-symbols-outlined text-text-main dark:text-[#E8DCC4] text-[28px]">person</span>
+                </div>
+                <span class="text-xs font-medium text-text-main dark:text-[#E8DCC4]">我的</span>
+            </a>
+        </div>
+    </nav>
+</body>
+
+</html>

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // 引入我们的核心首页与闪电战
-import 'presentation/pages/dashboard_page.dart';
+import 'package:cozy_clean/features/dashboard/presentation/pages/dashboard_page.dart';
 import 'core/providers/shared_prefs_provider.dart';
 
 Future<void> main() async {

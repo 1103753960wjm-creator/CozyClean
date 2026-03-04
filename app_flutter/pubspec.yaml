@@ -39,6 +39,9 @@ dependencies:
   share_plus: ^10.1.4
   intl: ^0.19.0
 
+  # 音频支持
+  audioplayers: ^6.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -53,4 +56,6 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/images/onboarding/
     - assets/fonts/
+    - assets/audio/

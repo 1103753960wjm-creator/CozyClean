@@ -24,7 +24,7 @@ import 'package:cozy_clean/features/blitz/data/providers/blitz_data_providers.da
 import 'package:cozy_clean/features/blitz/domain/models/photo_group.dart';
 import 'package:cozy_clean/features/blitz/domain/repositories/onboarding_repository.dart';
 import 'package:cozy_clean/features/blitz/domain/services/burst_grouping_service.dart';
-import 'package:cozy_clean/presentation/controllers/user_stats_controller.dart';
+import 'package:cozy_clean/features/profile/application/controllers/user_stats_controller.dart';
 
 // ============================================================
 // Isolate 分组支持 — 顶层函数（compute 要求）
@@ -190,6 +190,12 @@ class BlitzController extends Notifier<BlitzState> {
         onboardingLoaded: true,
       );
     }
+  }
+
+  /// 重置引导蒙版（将清理标记，并在当前页面强制展示蒙版）
+  Future<void> resetOnboarding() async {
+    await _onboardingRepository.clearSeenBlitzOnboarding();
+    state = state.copyWith(showOnboarding: true);
   }
 
   /// 关闭新手引导并异步写底层存储
@@ -388,14 +394,27 @@ class BlitzController extends Notifier<BlitzState> {
 
       case BlitzState.directionDown:
         // 下滑不消耗体力，所以不退还
-        state = state.copyWith(
-          currentGroupIndex: state.currentGroupIndex - 1,
-          sessionPending: removeFrom(state.sessionPending),
-          lastSwipedPhoto: () => null,
-          lastSwipeDirection: () => null,
-        );
+        if (state.isReviewingPending) {
+          state = state.copyWith(
+            pendingReviewIndex: state.pendingReviewIndex - 1,
+            sessionPending: removeFrom(state.sessionPending),
+            lastSwipedPhoto: () => null,
+            lastSwipeDirection: () => null,
+          );
+        } else {
+          state = state.copyWith(
+            currentGroupIndex: state.currentGroupIndex - 1,
+            sessionPending: removeFrom(state.sessionPending),
+            lastSwipedPhoto: () => null,
+            lastSwipeDirection: () => null,
+          );
+        }
         break;
     }
+
+    // ❌ [Bug 修复] 移除此处多余的索引递减代码
+    // 原逻辑在 switch 块内部已经正确处理了 index 递减（PendingReviewIndex 或 currentGroupIndex），
+    // 此处再次操作会导致索引错误回退双倍。
 
     return true;
   }
@@ -429,6 +448,8 @@ class BlitzController extends Notifier<BlitzState> {
     state = state.copyWith(
       sessionDeleted: [...state.sessionDeleted, photo],
       pendingReviewIndex: state.pendingReviewIndex + 1,
+      lastSwipedPhoto: () => photo,
+      lastSwipeDirection: () => BlitzState.directionLeft,
     );
   }
 
@@ -443,6 +464,8 @@ class BlitzController extends Notifier<BlitzState> {
     state = state.copyWith(
       sessionKept: [...state.sessionKept, photo],
       pendingReviewIndex: state.pendingReviewIndex + 1,
+      lastSwipedPhoto: () => photo,
+      lastSwipeDirection: () => BlitzState.directionRight,
     );
   }
 
@@ -460,6 +483,8 @@ class BlitzController extends Notifier<BlitzState> {
     state = state.copyWith(
       sessionFavorites: [...state.sessionFavorites, photo],
       pendingReviewIndex: state.pendingReviewIndex + 1,
+      lastSwipedPhoto: () => photo,
+      lastSwipeDirection: () => BlitzState.directionUp,
     );
     return true;
   }

@@ -7,7 +7,7 @@ import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 import 'package:cozy_clean/features/blitz/application/controllers/blitz_controller.dart';
 import 'package:cozy_clean/features/journal/presentation/pages/poster_page.dart';
-import '../controllers/user_stats_controller.dart';
+import 'package:cozy_clean/features/profile/application/controllers/user_stats_controller.dart';
 
 /// 总结算动画页面 (Summary Page)
 ///

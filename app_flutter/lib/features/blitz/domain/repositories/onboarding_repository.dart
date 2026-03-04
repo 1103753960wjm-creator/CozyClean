@@ -14,17 +14,34 @@ class OnboardingRepository {
   final SharedPreferences _prefs;
 
   static const String _kHasSeenBlitzOnboarding = 'has_seen_blitz_onboarding';
+  static const String _kHasSeenIntroSwiper = 'has_seen_intro_swiper';
 
   OnboardingRepository(this._prefs);
 
-  /// 检查用户是否已经看过闪电战新手引导
+  /// 检查用户是否已经看过 App 全屏开屏引导
+  bool hasSeenIntroSwiper() {
+    return _prefs.getBool(_kHasSeenIntroSwiper) ?? false;
+  }
+
+  /// 标记用户已经看过 App 全屏开屏引导
+  Future<void> setSeenIntroSwiper() async {
+    await _prefs.setBool(_kHasSeenIntroSwiper, true);
+  }
+
+  /// 检查用户是否已经看过闪电战操作导引蒙版
   /// 默认返回 false（没看过）
   bool hasSeenBlitzOnboarding() {
     return _prefs.getBool(_kHasSeenBlitzOnboarding) ?? false;
   }
 
-  /// 标记用户已经看过了闪电战新手引导
+  /// 标记用户已经看过了闪电战操作导引蒙版
   Future<void> setSeenBlitzOnboarding() async {
     await _prefs.setBool(_kHasSeenBlitzOnboarding, true);
+  }
+
+  /// 重置引导状态（用于测试或重新展示）
+  Future<void> clearSeenBlitzOnboarding() async {
+    await _prefs.remove(_kHasSeenBlitzOnboarding);
+    await _prefs.remove(_kHasSeenIntroSwiper);
   }
 }
