@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'dart:math' as math;
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:confetti/confetti.dart';
@@ -224,17 +225,31 @@ class _SummaryPageState extends ConsumerState<SummaryPage>
       // 小睡 300ms 避免由于 GC 处理文件句柄不够及时引发 Android File Busy
       await Future.delayed(const Duration(milliseconds: 300));
 
-      // 这句代码将调用系统级权限弹框 (iOS/Android) 询问用户是否允许删除
+      // 这句代码将尝试调用系统级全新回收站权限弹框 (iOS/Android) 询问用户是否允许移入回收站
       List<String> deletedList = [];
       if (idsToDelete.isNotEmpty) {
-        deletedList = await PhotoManager.editor.deleteWithIds(idsToDelete);
+        if (Platform.isAndroid) {
+          try {
+            // Android: 优先尝试移入系统回收站 (Android 11+ 支持)
+            deletedList =
+                await PhotoManager.editor.android.moveToTrash(widget.deleteSet);
+            // 如果返回为空，不论是用户拒绝还是失败，皆不作为崩溃处理
+          } catch (e) {
+            print('[SummaryPage] Android 回收站 API 调用异常/不支持，降级至物理删除: $e');
+            // 降级容错：旧版本 Android 强制执行物理删除
+            deletedList = await PhotoManager.editor.deleteWithIds(idsToDelete);
+          }
+        } else {
+          // iOS: 其原生设计 deleteWithIds 本就会默认进入『最近删除』
+          deletedList = await PhotoManager.editor.deleteWithIds(idsToDelete);
+        }
       }
 
-      print('[SummaryPage] 物理删除结果: $deletedList');
+      print('[SummaryPage] 回收站操作/删除结果: $deletedList');
 
       if (!mounted) return;
 
-      // 如果本来就无需删除，或者删除成功，都视为整体交互成功
+      // 如果本来就无需删除，或者最终系统确认且回调执行了清理
       final isSuccess = idsToDelete.isEmpty || deletedList.isNotEmpty;
 
       if (isSuccess) {
