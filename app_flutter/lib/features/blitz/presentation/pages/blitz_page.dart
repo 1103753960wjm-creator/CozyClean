@@ -109,48 +109,137 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
   }
 
   /// 四方向滑动结束事件处理
+  ///
+  /// 连拍组滑动后，弹窗询问其他照片保留还是删除。
   Future<void> _handleSwipeEnd(
     SwiperActivity activity,
     AssetEntity photo,
   ) async {
     if (activity is! Swipe) return;
     final notifier = ref.read(blitzControllerProvider.notifier);
+    final blitzState = ref.read(blitzControllerProvider);
 
+    // 记录滑动前的分组信息（滑动后 currentGroupIndex 会变）
+    final groupIndex = blitzState.currentGroupIndex;
+    final group =
+        (groupIndex >= 0 && groupIndex < blitzState.photoGroups.length)
+            ? blitzState.photoGroups[groupIndex]
+            : null;
+
+    bool success = true;
     switch (activity.direction) {
       case AxisDirection.left:
         HapticFeedback.mediumImpact();
-        final success = await notifier.swipeLeft(photo);
+        success = await notifier.swipeLeft(photo);
         if (!success) {
           _swiperController.unswipe();
           _showNoEnergyWarning();
+          return;
         }
         break;
 
       case AxisDirection.right:
         HapticFeedback.lightImpact();
-        final success = await notifier.swipeRight(photo);
+        success = await notifier.swipeRight(photo);
         if (!success) {
           _swiperController.unswipe();
           _showNoEnergyWarning();
+          return;
         }
         break;
 
       case AxisDirection.up:
         HapticFeedback.lightImpact();
-        final success = await notifier.swipeUp(photo);
+        success = await notifier.swipeUp(photo);
         if (!success) {
           _swiperController.unswipe();
           _showFavoritesFullWarning();
+          return;
         }
         break;
 
       case AxisDirection.down:
         HapticFeedback.selectionClick();
         notifier.swipeDown(photo);
-        // 触发待定区计数器弹跳动画
         _triggerPendingFlyAnimation();
-        break;
+        // 下滑到待定区不需要弹连拍决策
+        return;
     }
+
+    // 连拍组：弹窗询问其他照片处理方式
+    if (group != null && group.isBurst && success && mounted) {
+      final otherCount = group.count - 1;
+      _showBurstDecisionDialog(groupIndex, otherCount);
+    }
+  }
+
+  /// 连拍组其他照片决策弹窗
+  void _showBurstDecisionDialog(int groupIndex, int otherCount) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFFFAF9F6),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.burst_mode_rounded,
+                color: const Color(0xFF8A6549), size: 24),
+            const SizedBox(width: 8),
+            const Text(
+              '连拍组处理',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF4A4238),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          '连拍组中还有 $otherCount 张其他照片，\n你想如何处理？',
+          style: const TextStyle(
+            fontSize: 14,
+            color: Color(0xFF6B6560),
+            height: 1.5,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              ref
+                  .read(blitzControllerProvider.notifier)
+                  .handleBurstDecision(groupIndex, false);
+            },
+            child: const Text(
+              '全部保留',
+              style: TextStyle(
+                color: Color(0xFF8BA888),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              ref
+                  .read(blitzControllerProvider.notifier)
+                  .handleBurstDecision(groupIndex, true);
+            },
+            child: const Text(
+              '全部删除',
+              style: TextStyle(
+                color: Color(0xFFC75D56),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /// 收藏已满提示
@@ -1530,8 +1619,11 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
 
   /// 拍立得风格照片卡片
   ///
-  /// [stampController] 可选，默认使用 _swiperController，
-  /// 回放阶段传入 _pendingSwiperController。
+  /// 连拍组前台卡片展示：
+  ///   1. 灰色半透明堆叠层模拟其他照片
+  ///   2. 最佳照片为主展示照
+  ///   3. 底部胶片风格横滑选择条
+  ///   4. 点击选择条中的照片切换最佳照片
   Widget _buildPhotoCard(
     AssetEntity photo,
     PhotoGroup group, {
@@ -1566,7 +1658,39 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // 照片层
+                  // 连拍灰色堆叠层（仅前台卡片 + 连拍组）
+                  if (group.isBurst && isForeground) ...[
+                    // 第二层
+                    Positioned(
+                      left: 4,
+                      right: -4,
+                      top: -4,
+                      bottom: 4,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withValues(alpha: 0.15),
+                          border: Border.all(
+                              color: Colors.black.withValues(alpha: 0.06)),
+                        ),
+                      ),
+                    ),
+                    // 第三层（3张及以上）
+                    if (group.count > 2)
+                      Positioned(
+                        left: 8,
+                        right: -8,
+                        top: -8,
+                        bottom: 8,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey.withValues(alpha: 0.08),
+                            border: Border.all(
+                                color: Colors.black.withValues(alpha: 0.04)),
+                          ),
+                        ),
+                      ),
+                  ],
+                  // 主照片层
                   Container(
                     decoration: BoxDecoration(
                       border: Border.all(
@@ -1588,7 +1712,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                       },
                     ),
                   ),
-                  // 连拍标记
+                  // 连拍标记（带图标）
                   if (group.isBurst)
                     Positioned(
                       top: 8,
@@ -1600,13 +1724,21 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                           color: Colors.black.withValues(alpha: 0.6),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Text(
-                          '${group.count} 张连拍',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.burst_mode_rounded,
+                                color: Colors.white, size: 12),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${group.count} 张连拍',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -1616,9 +1748,84 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
               ),
             ),
           ),
-          // 底部留白
-          const SizedBox(height: 60),
+          // 底部：连拍组显示胶片选择条，非连拍组留白
+          if (group.isBurst && isForeground)
+            _buildFilmStripSelector(group)
+          else
+            const SizedBox(height: 60),
         ],
+      ),
+    );
+  }
+
+  /// 胶片风格横滑选择条
+  ///
+  /// 底部固定高度区域，水平展示连拍组的所有照片缩略图。
+  /// 当前最佳照片高亮显示金色边框，其他照片灰色调。
+  /// 点击切换最佳照片。
+  Widget _buildFilmStripSelector(PhotoGroup group) {
+    final blitzState = ref.read(blitzControllerProvider);
+    final currentIdx = blitzState.currentGroupIndex;
+
+    return Container(
+      height: 60,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Center(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(group.photos.length, (i) {
+              final isSelected = i == group.bestIndex;
+              return GestureDetector(
+                onTap: () {
+                  ref
+                      .read(blitzControllerProvider.notifier)
+                      .selectBestPhoto(currentIdx, i);
+                },
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: isSelected
+                          ? const Color(0xFFD4AF37)
+                          : Colors.transparent,
+                      width: 2,
+                    ),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: const Color(0xFFD4AF37)
+                                  .withValues(alpha: 0.3),
+                              blurRadius: 6,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: ColorFiltered(
+                      colorFilter: isSelected
+                          ? const ColorFilter.mode(
+                              Colors.transparent, BlendMode.multiply)
+                          : ColorFilter.mode(Colors.grey.withValues(alpha: 0.5),
+                              BlendMode.saturation),
+                      child: AssetEntityImage(
+                        group.photos[i],
+                        isOriginal: false,
+                        thumbnailSize: const ThumbnailSize(200, 200),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
       ),
     );
   }

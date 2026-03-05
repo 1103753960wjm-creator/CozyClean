@@ -24,6 +24,7 @@ import 'package:cozy_clean/features/blitz/data/providers/blitz_data_providers.da
 import 'package:cozy_clean/features/blitz/domain/models/photo_group.dart';
 import 'package:cozy_clean/features/blitz/domain/repositories/onboarding_repository.dart';
 import 'package:cozy_clean/features/blitz/domain/services/burst_grouping_service.dart';
+import 'package:cozy_clean/features/blitz/domain/services/image_clarity_service.dart';
 import 'package:cozy_clean/presentation/controllers/user_stats_controller.dart';
 
 // ============================================================
@@ -71,6 +72,11 @@ final burstGroupingServiceProvider = Provider<BurstGroupingService>((ref) {
   return const BurstGroupingService();
 });
 
+/// 图片清晰度评估服务 Provider
+final imageClarityServiceProvider = Provider<ImageClarityService>((ref) {
+  return const ImageClarityService();
+});
+
 /// 闪电战控制器 Provider
 final blitzControllerProvider =
     NotifierProvider<BlitzController, BlitzState>(BlitzController.new);
@@ -92,6 +98,8 @@ class BlitzController extends Notifier<BlitzState> {
   BlitzRepository get _repository => ref.read(blitzRepositoryProvider);
   BurstGroupingService get _burstService =>
       ref.read(burstGroupingServiceProvider);
+  ImageClarityService get _clarityService =>
+      ref.read(imageClarityServiceProvider);
   OnboardingRepository get _onboardingRepository =>
       ref.read(onboardingRepositoryProvider);
 
@@ -205,34 +213,44 @@ class BlitzController extends Notifier<BlitzState> {
   static const int _isolateThreshold = 300;
 
   /// 自动选择主线程或 isolate 执行连拍分组
+  ///
+  /// 分组完成后，对每个连拍组使用清晰度服务自动选出最佳照片。
   Future<List<PhotoGroup>> _groupPhotos(List<AssetEntity> sortedPhotos) async {
+    List<PhotoGroup> rawGroups;
+
     if (sortedPhotos.length <= _isolateThreshold) {
       debugPrint('[BlitzController] 主线程分组 (${sortedPhotos.length} 张)');
-      return _burstService.groupBurstPhotos(sortedPhotos);
+      rawGroups = _burstService.groupBurstPhotos(sortedPhotos);
+    } else {
+      debugPrint('[BlitzController] Isolate 分组 (${sortedPhotos.length} 张)');
+
+      final timestamps = sortedPhotos
+          .map((p) => p.createDateTime.millisecondsSinceEpoch)
+          .toList();
+
+      final boundaries = await compute(
+        _computeBurstGroupBoundaries,
+        _BurstGroupingParams(
+          timestamps: timestamps,
+          thresholdMs: _burstService.burstThresholdMs,
+        ),
+      );
+
+      if (boundaries.isEmpty) return const [];
+
+      rawGroups = [];
+      for (int i = 0; i < boundaries.length - 1; i++) {
+        rawGroups.add(PhotoGroup(
+            photos: sortedPhotos.sublist(boundaries[i], boundaries[i + 1])));
+      }
     }
 
-    debugPrint('[BlitzController] Isolate 分组 (${sortedPhotos.length} 张)');
-
-    final timestamps = sortedPhotos
-        .map((p) => p.createDateTime.millisecondsSinceEpoch)
-        .toList();
-
-    final boundaries = await compute(
-      _computeBurstGroupBoundaries,
-      _BurstGroupingParams(
-        timestamps: timestamps,
-        thresholdMs: _burstService.burstThresholdMs,
-      ),
-    );
-
-    if (boundaries.isEmpty) return const [];
-
-    final List<PhotoGroup> groups = [];
-    for (int i = 0; i < boundaries.length - 1; i++) {
-      groups.add(PhotoGroup(
-          photos: sortedPhotos.sublist(boundaries[i], boundaries[i + 1])));
-    }
-    return groups;
+    // 对连拍组自动评估最佳照片（文件大小近似清晰度）
+    return rawGroups.map((group) {
+      if (!group.isBurst) return group;
+      final bestIdx = _clarityService.findBestPhotoIndex(group.photos);
+      return PhotoGroup(photos: group.photos, bestIndex: bestIdx);
+    }).toList();
   }
 
   // ============================================================
@@ -472,6 +490,63 @@ class BlitzController extends Notifier<BlitzState> {
     state = state.copyWith(
       isReviewingPending: false,
     );
+  }
+
+  /// 用户手动选择连拍组最佳照片
+  ///
+  /// 更新当前分组的 bestIndex，UI 层切换展示照片。
+  /// [groupIndex] 目标分组索引（通常为 currentGroupIndex）。
+  /// [photoIndex] 用户选中的照片在该组 photos 中的索引。
+  void selectBestPhoto(int groupIndex, int photoIndex) {
+    if (groupIndex < 0 || groupIndex >= state.photoGroups.length) return;
+    final group = state.photoGroups[groupIndex];
+    if (photoIndex < 0 || photoIndex >= group.photos.length) return;
+    if (photoIndex == group.bestIndex) return; // 无变化
+
+    // 创建更新了 bestIndex 的新分组
+    final updatedGroup = PhotoGroup(
+      photos: group.photos,
+      bestIndex: photoIndex,
+    );
+
+    // 替换 photoGroups 中对应分组
+    final updatedGroups = List<PhotoGroup>.from(state.photoGroups);
+    updatedGroups[groupIndex] = updatedGroup;
+
+    state = state.copyWith(photoGroups: updatedGroups);
+  }
+
+  /// 处理连拍组其他照片的决策（bestPhoto 已由 swipe 处理）
+  ///
+  /// 用户滑动连拍组后，弹窗询问其他照片"保留"还是"删除"。
+  /// [groupIndex] 目标分组索引。
+  /// [deleteOthers] true=删除其他照片，false=保留其他照片。
+  void handleBurstDecision(int groupIndex, bool deleteOthers) {
+    if (groupIndex < 0 || groupIndex >= state.photoGroups.length) return;
+    final group = state.photoGroups[groupIndex];
+    if (!group.isBurst) return;
+
+    // 收集除 bestPhoto 外的其他照片
+    final otherPhotos = <AssetEntity>[];
+    for (int i = 0; i < group.photos.length; i++) {
+      if (i != group.bestIndex) {
+        otherPhotos.add(group.photos[i]);
+      }
+    }
+
+    if (otherPhotos.isEmpty) return;
+
+    if (deleteOthers) {
+      // 其他照片全部加入删除列表
+      state = state.copyWith(
+        sessionDeleted: [...state.sessionDeleted, ...otherPhotos],
+      );
+    } else {
+      // 其他照片全部加入保留列表
+      state = state.copyWith(
+        sessionKept: [...state.sessionKept, ...otherPhotos],
+      );
+    }
   }
 
   /// 清空本轮内存草稿（用户中途退出时调用）
