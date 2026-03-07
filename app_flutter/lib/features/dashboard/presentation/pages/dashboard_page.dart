@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cozy_clean/core/services/blitz_prewarm_service.dart';
+import 'package:cozy_clean/core/services/blitz_rollout_service.dart';
 import 'package:cozy_clean/features/blitz/presentation/pages/blitz_page.dart';
 import 'package:cozy_clean/features/profile/application/controllers/user_stats_controller.dart';
 import 'package:cozy_clean/features/profile/presentation/pages/profile_page.dart';
@@ -24,6 +26,12 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   void initState() {
     super.initState();
     _checkOnboarding();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final rollout = ref.read(blitzRolloutServiceProvider);
+      if (rollout.isPrewarmEnabled) {
+        ref.read(blitzPrewarmServiceProvider.notifier).warmUp();
+      }
+    });
   }
 
   void _checkOnboarding() {

@@ -27,7 +27,6 @@ import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 import 'package:cozy_clean/features/blitz/application/controllers/blitz_controller.dart';
 import 'package:cozy_clean/features/blitz/application/state/blitz_state.dart';
 import 'package:cozy_clean/features/blitz/domain/models/photo_group.dart';
-import 'package:cozy_clean/features/profile/application/controllers/user_stats_controller.dart';
 import 'package:cozy_clean/features/blitz/presentation/pages/summary_page.dart';
 
 /// 闪电战核心展示主页 — 四方向滑动整理照片
@@ -598,8 +597,6 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
 
   /// 退出确认
   void _showExitConfirmationBottomSheet() {
-    final state = ref.read(blitzControllerProvider);
-
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -617,7 +614,7 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                '等等！',
+                '是否确认退出',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -625,9 +622,9 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                 ),
               ),
               const SizedBox(height: 12),
-              Text(
-                '你有 ${state.deletedCount} 张废片待清理，要现在归档吗？',
-                style: const TextStyle(fontSize: 16, color: Colors.black54),
+              const Text(
+                '本轮整理进度不会保存',
+                style: TextStyle(fontSize: 16, color: Colors.black54),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
@@ -643,14 +640,10 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                         ),
                       ),
                       onPressed: () {
-                        ref
-                            .read(blitzControllerProvider.notifier)
-                            .clearSessionDraft();
                         Navigator.of(ctx).pop();
-                        Navigator.of(context).pop();
                       },
                       child: const Text(
-                        '手滑放弃',
+                        '手滑了',
                         style: TextStyle(
                           color: Color(0xFFC75D56),
                           fontSize: 16,
@@ -671,11 +664,14 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
                         ),
                       ),
                       onPressed: () {
+                        ref
+                            .read(blitzControllerProvider.notifier)
+                            .clearSessionDraft(clearPhotoGroups: false);
                         Navigator.of(ctx).pop();
-                        _navigateToSummary(state);
+                        Navigator.of(context).pop();
                       },
                       child: const Text(
-                        '这就去清',
+                        '确认退出',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -694,27 +690,22 @@ class _BlitzPageState extends ConsumerState<BlitzPage> {
     );
   }
 
+  bool _hasExitDraft(BlitzState state) {
+    return state.sessionDeleted.isNotEmpty ||
+        state.sessionKept.isNotEmpty ||
+        state.sessionFavorites.isNotEmpty ||
+        state.sessionPending.isNotEmpty;
+  }
+
   /// 页面脚手架（含返回拦截）
   Widget _buildScaffold(BuildContext context, Widget child) {
+    final state = ref.watch(blitzControllerProvider);
+    final hasExitDraft = _hasExitDraft(state);
+
     return PopScope(
-      canPop: ref.watch(blitzControllerProvider).sessionDeleted.isEmpty,
+      canPop: !hasExitDraft,
       onPopInvoked: (didPop) {
-        if (didPop) {
-          final state = ref.read(blitzControllerProvider);
-          if (state.sessionKept.isNotEmpty ||
-              state.sessionFavorites.isNotEmpty) {
-            ref.read(userStatsControllerProvider).commitBlitzSession(
-              keeps: {
-                ...state.sessionKept.map((p) => p.id),
-                ...state.sessionFavorites.map((p) => p.id),
-              },
-              deletes: const {},
-              savedBytes: 0,
-            );
-            ref.read(blitzControllerProvider.notifier).clearSessionDraft();
-          }
-          return;
-        }
+        if (didPop) return;
         _showExitConfirmationBottomSheet();
       },
       child: Scaffold(

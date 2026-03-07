@@ -14,11 +14,16 @@
 ///   - ✅ 仅通过 Service 执行纯业务逻辑
 library;
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photo_manager/photo_manager.dart';
 
+import 'package:cozy_clean/core/services/blitz_prewarm_service.dart';
+import 'package:cozy_clean/core/services/blitz_rollout_service.dart';
+import 'package:cozy_clean/core/state/blitz_prewarm_state.dart';
 import 'package:cozy_clean/features/blitz/application/state/blitz_state.dart';
 import 'package:cozy_clean/features/blitz/data/providers/blitz_data_providers.dart';
 import 'package:cozy_clean/features/blitz/domain/models/photo_group.dart';
@@ -91,6 +96,7 @@ final blitzControllerProvider =
 /// Controller 本身不执行任何 IO，是纯粹的业务逻辑协调者。
 class BlitzController extends Notifier<BlitzState> {
   bool _loadingInProgress = false;
+  int _loadRequestToken = 0;
 
   @override
   BlitzState build() => const BlitzState(isLoading: true);
@@ -113,9 +119,17 @@ class BlitzController extends Notifier<BlitzState> {
   Future<void> loadPhotos() async {
     if (_loadingInProgress) return;
     _loadingInProgress = true;
+    final loadToken = ++_loadRequestToken;
+    final rollout = ref.read(blitzRolloutServiceProvider);
+    final prewarmState = ref.read(blitzPrewarmServiceProvider);
+    final isPrewarmEnabled = rollout.isPrewarmEnabled;
+    final hasVisibleData = state.photoGroups.isNotEmpty;
+    // 仅当当前 state 已有可视数据时才直接显示。
+    // 避免“预热命中但尚未 hydrate 完成”阶段短暂落入空页面。
+    final canInstantShow = hasVisibleData;
 
     state = state.copyWith(
-      isLoading: true,
+      isLoading: !canInstantShow,
       errorMessage: () => null,
       sessionDeleted: const [],
       sessionKept: const [],
@@ -133,21 +147,65 @@ class BlitzController extends Notifier<BlitzState> {
         return;
       }
 
+      final prewarmNotifier = ref.read(blitzPrewarmServiceProvider.notifier);
+      if (isPrewarmEnabled && prewarmState.hasData) {
+        final prewarmPhotos =
+            await _repository.fetchAssetsByIds(prewarmState.assetIds);
+        final prewarmGroups =
+            _hydrateGroupsFromPrewarm(prewarmState.groups, prewarmPhotos);
+
+        if (prewarmPhotos.isNotEmpty && prewarmGroups.isNotEmpty) {
+          debugPrint('[BlitzController] 预热命中: 资产=${prewarmPhotos.length}, '
+              '分组=${prewarmGroups.length}');
+          final energyStatus = await _repository.getUserEnergyStatus();
+
+          state = state.copyWith(
+            photoGroups: prewarmGroups,
+            totalPhotoCount: prewarmPhotos.length,
+            currentGroupIndex: 0,
+            currentEnergy: energyStatus.energy,
+            isLoading: false,
+            errorMessage: () => null,
+            sessionDeleted: const [],
+            sessionKept: const [],
+            sessionFavorites: const [],
+            sessionPending: const [],
+            thumbnailCache: const <String, Uint8List>{},
+          );
+          unawaited(_preloadThumbnailsInBackground(prewarmPhotos, loadToken));
+
+          if (prewarmState.isStale) {
+            prewarmNotifier.scheduleRefresh();
+          } else {
+            prewarmNotifier.warmUp();
+          }
+          unawaited(rollout.recordPrewarmHit());
+          return;
+        }
+      }
+
       final flatPhotos = await _repository.fetchUnprocessedPhotos();
       if (flatPhotos.isEmpty) {
         state = state.copyWith(
           isLoading: false,
           photoGroups: const [],
         );
+        if (isPrewarmEnabled) {
+          prewarmNotifier.markStale();
+          prewarmNotifier.scheduleRefresh();
+          unawaited(rollout.recordPrewarmMiss());
+        }
         return;
       }
 
+      // 连拍分组仍使用升序输入，保证算法行为与历史一致；
+      // 仅在输出阶段转换为“最新优先”的展示顺序。
       final sortedPhotos = List<AssetEntity>.from(flatPhotos.reversed);
-      final groups = await _groupPhotos(sortedPhotos);
+      final groupedPhotos = await _groupPhotos(sortedPhotos);
+      final groups = _toNewestFirstDisplayOrder(groupedPhotos);
       debugPrint('[BlitzController] 分组完成: ${groups.length} 组 '
-          '(来自 ${flatPhotos.length} 张照片)');
+          '(来自 ${flatPhotos.length} 张照片, 最新优先展示)');
 
-      final cache = await _repository.preloadThumbnails(flatPhotos);
       final energyStatus = await _repository.getUserEnergyStatus();
 
       state = state.copyWith(
@@ -161,9 +219,14 @@ class BlitzController extends Notifier<BlitzState> {
         sessionKept: const [],
         sessionFavorites: const [],
         sessionPending: const [],
-        thumbnailCache: cache,
+        thumbnailCache: const <String, Uint8List>{},
       );
+      unawaited(_preloadThumbnailsInBackground(flatPhotos, loadToken));
 
+      if (isPrewarmEnabled) {
+        prewarmNotifier.warmUp();
+        unawaited(rollout.recordPrewarmMiss());
+      }
       debugPrint('[BlitzController] ✅ 加载完成: '
           '${groups.length} 组, 体力 ${energyStatus.energy}');
     } catch (e, stackTrace) {
@@ -257,6 +320,93 @@ class BlitzController extends Notifier<BlitzState> {
       final bestIdx = _clarityService.findBestPhotoIndex(group.photos);
       return PhotoGroup(photos: group.photos, bestIndex: bestIdx);
     }).toList();
+  }
+
+  /// 根据预热快照恢复 PhotoGroup。
+  List<PhotoGroup> _hydrateGroupsFromPrewarm(
+    List<PhotoGroupLite> liteGroups,
+    List<AssetEntity> assets,
+  ) {
+    if (liteGroups.isEmpty || assets.isEmpty) return const <PhotoGroup>[];
+
+    final assetById = <String, AssetEntity>{
+      for (final asset in assets) asset.id: asset,
+    };
+
+    final hydratedGroups = <PhotoGroup>[];
+    for (final group in liteGroups) {
+      final photos = <AssetEntity>[];
+      for (final id in group.assetIds) {
+        final entity = assetById[id];
+        if (entity != null) {
+          photos.add(entity);
+        }
+      }
+
+      if (photos.isEmpty) continue;
+
+      final safeBestIndex =
+          group.bestIndex >= 0 && group.bestIndex < photos.length
+              ? group.bestIndex
+              : 0;
+      hydratedGroups.add(
+        PhotoGroup(
+          photos: photos,
+          bestIndex: safeBestIndex,
+        ),
+      );
+    }
+
+    final groupedWithBest = hydratedGroups.map((group) {
+      if (!group.isBurst) return group;
+      final bestIdx = _clarityService.findBestPhotoIndex(group.photos);
+      return PhotoGroup(photos: group.photos, bestIndex: bestIdx);
+    }).toList(growable: false);
+
+    return _toNewestFirstDisplayOrder(groupedWithBest);
+  }
+
+  /// 将分组结果转换为“最新优先”展示顺序。
+  ///
+  /// 连拍分组算法保持原有升序输入，
+  /// 此处仅做 UI 展示顺序转换，并同步映射 bestIndex。
+  List<PhotoGroup> _toNewestFirstDisplayOrder(List<PhotoGroup> groups) {
+    if (groups.isEmpty) return const <PhotoGroup>[];
+
+    return groups.reversed.map((group) {
+      final reversedPhotos = group.photos.reversed.toList(growable: false);
+      final mappedBestIndex = reversedPhotos.length - 1 - group.bestIndex;
+      final safeBestIndex =
+          mappedBestIndex >= 0 && mappedBestIndex < reversedPhotos.length
+              ? mappedBestIndex
+              : 0;
+      return PhotoGroup(
+        photos: reversedPhotos,
+        bestIndex: safeBestIndex,
+      );
+    }).toList(growable: false);
+  }
+
+  /// 后台预载缩略图，避免阻塞首屏进入。
+  Future<void> _preloadThumbnailsInBackground(
+    List<AssetEntity> photos,
+    int requestToken,
+  ) async {
+    if (photos.isEmpty) return;
+
+    try {
+      final cache = await _repository.preloadThumbnails(photos);
+      if (requestToken != _loadRequestToken || cache.isEmpty) return;
+
+      state = state.copyWith(
+        thumbnailCache: <String, Uint8List>{
+          ...state.thumbnailCache,
+          ...cache,
+        },
+      );
+    } catch (e, stackTrace) {
+      debugPrint('[BlitzController] 后台预载缩略图失败: $e\n$stackTrace');
+    }
   }
 
   // ============================================================
@@ -574,11 +724,14 @@ class BlitzController extends Notifier<BlitzState> {
     }
   }
 
-  /// 清空本轮内存草稿（用户中途退出时调用）
-  void clearSessionDraft() {
+  /// 清空会话草稿。
+  ///
+  /// [clearPhotoGroups] 为 true 时，同时清空当前照片列表与索引；
+  /// 为 false 时仅清理会话草稿，避免退出动画期间闪现空状态页。
+  void clearSessionDraft({bool clearPhotoGroups = true}) {
     state = state.copyWith(
-      photoGroups: const [],
-      currentGroupIndex: 0,
+      photoGroups: clearPhotoGroups ? const [] : state.photoGroups,
+      currentGroupIndex: clearPhotoGroups ? 0 : state.currentGroupIndex,
       sessionDeleted: const [],
       sessionKept: const [],
       sessionFavorites: const [],
@@ -587,10 +740,39 @@ class BlitzController extends Notifier<BlitzState> {
       lastSwipeDirection: () => null,
       isReviewingPending: false,
       pendingReviewIndex: 0,
+      errorMessage: () => null,
     );
   }
 
-  /// 清空所有照片处理记录并重新加载
+  /// 执行会话删除确认链路：Controller -> Repository -> DataSource。
+  Future<List<String>> confirmDeletion(List<String> ids) async {
+    try {
+      final deletedIds = await _repository.trashAssets(ids);
+      final rollout = ref.read(blitzRolloutServiceProvider);
+      unawaited(
+        rollout.recordDeletion(
+          requestedCount: ids.length,
+          deletedCount: deletedIds.length,
+        ),
+      );
+      final prewarmNotifier = ref.read(blitzPrewarmServiceProvider.notifier);
+      prewarmNotifier.markStale();
+      prewarmNotifier.scheduleRefresh();
+      return deletedIds;
+    } catch (e, stackTrace) {
+      final rollout = ref.read(blitzRolloutServiceProvider);
+      unawaited(
+        rollout.recordDeletion(
+          requestedCount: ids.length,
+          deletedCount: 0,
+        ),
+      );
+      debugPrint('[BlitzController] 删除确认失败: $e\n$stackTrace');
+      return const <String>[];
+    }
+  }
+
+  /// 清空所有照片处理记录并重新加载。
   Future<void> resetAllPhotoActions() async {
     HapticFeedback.lightImpact();
     await _repository.deleteAllPhotoActions();

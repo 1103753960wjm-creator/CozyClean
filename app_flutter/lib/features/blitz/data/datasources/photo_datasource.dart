@@ -23,6 +23,8 @@
 ///   防止平台通道异常导致 App 崩溃（规范第 10、15 条）。
 library;
 
+import 'dart:io' show Platform;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -45,6 +47,51 @@ import 'package:photo_manager/photo_manager.dart';
 /// ```
 class PhotoDataSource {
   const PhotoDataSource();
+
+  Future<int> _safeAlbumCount(AssetPathEntity album) async {
+    try {
+      final dynamic count = await (album as dynamic).assetCountAsync;
+      if (count is int) return count;
+    } catch (_) {
+      // 平台实现差异时返回 unknown。
+    }
+    return -1;
+  }
+
+  String _albumLabel(AssetPathEntity album) {
+    try {
+      final dynamic dynamicAlbum = album;
+      final dynamic name = dynamicAlbum.name;
+      final dynamic id = dynamicAlbum.id;
+      final safeName = name is String && name.isNotEmpty ? name : 'unknown';
+      final safeId = id is String && id.isNotEmpty ? id : 'unknown';
+      return '$safeName($safeId)';
+    } catch (_) {
+      return 'unknown';
+    }
+  }
+
+  Future<AssetPathEntity?> _selectPrimaryAlbum(
+      List<AssetPathEntity> albums) async {
+    if (albums.isEmpty) return null;
+
+    AssetPathEntity selected = albums.first;
+    int selectedCount = await _safeAlbumCount(selected);
+
+    for (int i = 1; i < albums.length; i++) {
+      final candidate = albums[i];
+      final candidateCount = await _safeAlbumCount(candidate);
+      if (candidateCount > selectedCount) {
+        selected = candidate;
+        selectedCount = candidateCount;
+      }
+    }
+
+    final countLabel = selectedCount >= 0 ? '$selectedCount' : 'unknown';
+    debugPrint('[PhotoDataSource] 选择主相册: ${_albumLabel(selected)}, '
+        'assetCount=$countLabel');
+    return selected;
+  }
 
   /// 请求并检查相册访问权限
   ///
@@ -77,7 +124,7 @@ class PhotoDataSource {
   /// 从系统相册加载全部照片（按创建时间降序）
   ///
   /// **功能边界：**
-  ///   - ✅ 获取相册列表 → 取第一个相册 → 游标翻页抓取照片
+  ///   - ✅ 获取相册列表 → 选择主相册 → 游标翻页抓取照片
   ///   - ❌ 不做连拍分组（由 BurstGroupingService 负责）
   ///   - ❌ 不做去重过滤（由 Repository 负责）
   ///   - ❌ 不做缩略图加载（由 Repository 负责）
@@ -115,8 +162,19 @@ class PhotoDataSource {
         return const [];
       }
 
-      // 2. 取第一个相册（通常是"所有照片" / "最近项目"）
-      final recentAlbum = albums.first;
+      debugPrint('[PhotoDataSource] 相册总数: ${albums.length}');
+
+      // 2. 选择主相册（优先资产数最多）
+      final primaryAlbum = await _selectPrimaryAlbum(albums);
+      if (primaryAlbum == null) {
+        debugPrint('[PhotoDataSource] 主相册选择失败');
+        return const [];
+      }
+
+      final primaryCount = await _safeAlbumCount(primaryAlbum);
+      final countLabel = primaryCount >= 0 ? '$primaryCount' : 'unknown';
+      debugPrint('[PhotoDataSource] 主相册开始读取: ${_albumLabel(primaryAlbum)}, '
+          'maxCount=$maxCount, albumCount=$countLabel');
 
       // 3. 游标翻页抓取，直到凑够 maxCount 或相册见底
       final List<AssetEntity> result = [];
@@ -125,7 +183,7 @@ class PhotoDataSource {
       final int pageSize = maxCount.clamp(1, 200);
 
       while (result.length < maxCount) {
-        final batch = await recentAlbum.getAssetListPaged(
+        final batch = await primaryAlbum.getAssetListPaged(
           page: currentPage,
           size: pageSize,
         );
@@ -144,7 +202,7 @@ class PhotoDataSource {
           result.length > maxCount ? result.sublist(0, maxCount) : result;
 
       debugPrint('[PhotoDataSource] ✅ 加载 ${photos.length} 张照片 '
-          '(翻了 $currentPage 页)');
+          '(翻了 $currentPage 页, 主相册=${_albumLabel(primaryAlbum)})');
       return photos;
     } on PlatformException catch (e) {
       debugPrint('[PhotoDataSource] 加载照片平台异常: $e');
@@ -182,6 +240,59 @@ class PhotoDataSource {
     } catch (e) {
       debugPrint('[PhotoDataSource] 缩略图加载异常 (${photo.id}): $e');
       return null;
+    }
+  }
+
+  /// 按 ID 列表加载照片实体。
+  Future<List<AssetEntity>> loadAssetsByIds(List<String> ids) async {
+    if (ids.isEmpty) return const <AssetEntity>[];
+
+    try {
+      final entities = await Future.wait(
+        ids.map(AssetEntity.fromId),
+      );
+
+      final result = entities.whereType<AssetEntity>().toList(growable: false);
+      debugPrint('[PhotoDataSource] 按 ID 回填成功: ${result.length}/${ids.length}');
+      return result;
+    } on PlatformException catch (e) {
+      debugPrint('[PhotoDataSource] 按 ID 回填平台异常: $e');
+      return const <AssetEntity>[];
+    } catch (e, stackTrace) {
+      debugPrint('[PhotoDataSource] 按 ID 回填异常: $e\n$stackTrace');
+      return const <AssetEntity>[];
+    }
+  }
+
+  /// 将照片移入回收站或执行删除。
+  Future<List<String>> trashAssets(List<String> ids) async {
+    if (ids.isEmpty) return const <String>[];
+
+    try {
+      await PhotoManager.clearFileCache();
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      if (Platform.isAndroid) {
+        try {
+          final entities = await loadAssetsByIds(ids);
+          if (entities.isEmpty) {
+            return const <String>[];
+          }
+          return await PhotoManager.editor.android.moveToTrash(entities);
+        } catch (e) {
+          debugPrint(
+              '[PhotoDataSource] Android moveToTrash 失败，降级 deleteWithIds: $e');
+          return await PhotoManager.editor.deleteWithIds(ids);
+        }
+      }
+
+      return await PhotoManager.editor.deleteWithIds(ids);
+    } on PlatformException catch (e) {
+      debugPrint('[PhotoDataSource] 删除平台异常: $e');
+      return const <String>[];
+    } catch (e, stackTrace) {
+      debugPrint('[PhotoDataSource] 删除异常: $e\n$stackTrace');
+      return const <String>[];
     }
   }
 }

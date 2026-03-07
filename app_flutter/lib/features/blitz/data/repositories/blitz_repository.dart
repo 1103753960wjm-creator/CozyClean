@@ -29,7 +29,6 @@
 ///   通过 BurstGroupingService 按需执行。
 library;
 
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:photo_manager/photo_manager.dart';
 
@@ -71,6 +70,16 @@ class BlitzRepository {
     return _dataSource.requestPermission();
   }
 
+  /// 按 ID 列表回填照片实体。
+  Future<List<AssetEntity>> fetchAssetsByIds(List<String> ids) {
+    return _dataSource.loadAssetsByIds(ids);
+  }
+
+  /// 批量移入回收站/删除。
+  Future<List<String>> trashAssets(List<String> ids) {
+    return _dataSource.trashAssets(ids);
+  }
+
   // ============================================================
   // 照片获取与去重
   // ============================================================
@@ -93,33 +102,68 @@ class BlitzRepository {
   Future<List<AssetEntity>> fetchUnprocessedPhotos({
     int targetCount = 50,
     int fetchCount = 200,
+    int maxScanCount = 5000,
   }) async {
     try {
-      // 1. 从 DataSource 获取原始照片
-      final rawPhotos = await _dataSource.loadAllPhotos(maxCount: fetchCount);
-      if (rawPhotos.isEmpty) return const [];
+      final safeTargetCount = targetCount <= 0 ? 1 : targetCount;
+      final safeMaxScanCount =
+          maxScanCount < safeTargetCount ? safeTargetCount : maxScanCount;
 
-      // 2. 查询已处理的照片 ID 集合
+      // 1. 查询已处理的照片 ID 集合
       final processedIds = await getProcessedPhotoIds();
       debugPrint('[BlitzRepository] 已处理照片数: ${processedIds.length}');
 
-      // 3. 过滤掉已处理的照片
-      final unprocessed =
-          rawPhotos.where((p) => !processedIds.contains(p.id)).toList();
+      // 2. 渐进扩大扫描窗口，直到凑够目标数量或相册见底
+      int requestCount =
+          fetchCount < safeTargetCount ? safeTargetCount : fetchCount;
+      if (requestCount > safeMaxScanCount) {
+        requestCount = safeMaxScanCount;
+      }
 
-      // 4. 截取至目标数量
-      final result = unprocessed.length > targetCount
-          ? unprocessed.sublist(0, targetCount)
+      List<AssetEntity> rawPhotos = const <AssetEntity>[];
+      List<AssetEntity> unprocessed = const <AssetEntity>[];
+
+      while (true) {
+        rawPhotos = await _dataSource.loadAllPhotos(maxCount: requestCount);
+        if (rawPhotos.isEmpty) {
+          debugPrint('[BlitzRepository] 原始照片为空，停止扫描');
+          return const <AssetEntity>[];
+        }
+
+        unprocessed = rawPhotos
+            .where((p) => !processedIds.contains(p.id))
+            .toList(growable: false);
+
+        final reachedTarget = unprocessed.length >= safeTargetCount;
+        final reachedAlbumEnd = rawPhotos.length < requestCount;
+        final reachedScanLimit = requestCount >= safeMaxScanCount;
+
+        debugPrint('[BlitzRepository] 扫描窗口=$requestCount, '
+            '原始=${rawPhotos.length}, 未处理=${unprocessed.length}, '
+            '达到目标=$reachedTarget, 触底=$reachedAlbumEnd, 达上限=$reachedScanLimit');
+
+        if (reachedTarget || reachedAlbumEnd || reachedScanLimit) {
+          break;
+        }
+
+        final nextWindow = requestCount * 2;
+        requestCount =
+            nextWindow > safeMaxScanCount ? safeMaxScanCount : nextWindow;
+      }
+
+      // 3. 截取至目标数量
+      final result = unprocessed.length > safeTargetCount
+          ? unprocessed.sublist(0, safeTargetCount)
           : unprocessed;
 
-      debugPrint('[BlitzRepository] ✅ 获取 ${result.length} 张未处理照片');
+      debugPrint('[BlitzRepository] ✅ 获取 ${result.length} 张未处理照片 '
+          '(最终窗口=$requestCount, 原始=${rawPhotos.length}, 未处理=${unprocessed.length})');
       return result;
-    } catch (e) {
-      debugPrint('[BlitzRepository] 获取未处理照片失败: $e');
-      return const [];
+    } catch (e, stackTrace) {
+      debugPrint('[BlitzRepository] 获取未处理照片失败: $e\n$stackTrace');
+      return const <AssetEntity>[];
     }
   }
-
   // ============================================================
   // 缩略图预加载
   // ============================================================
